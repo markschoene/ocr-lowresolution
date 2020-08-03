@@ -5,6 +5,9 @@ import re
 import difflib
 import editdistance
 import csv
+import pandas as pd
+import numpy as np
+from sklearn.metrics import confusion_matrix
 
 
 def get_metrics(pagetxt, gt, filename):
@@ -191,3 +194,44 @@ if __name__ == '__main__':
         print(cmpcsv)
     else:
         print(cmptxt)
+
+
+def get_confusion_matrix(gt, tess, sort_by_confusion=False):
+    """
+
+    :param gt: (str) ground truth text
+    :param tess: (str) predicted tesseract text
+    :param sort_by_confusion: (bool) if 'True' sorts columns of the output matrix by the total number of confusions
+    :return: (Pandas DataFrame) confusion matrix
+    """
+    s = difflib.SequenceMatcher(None, gt, tess, autojunk=False)
+
+    truth = []
+    pred = []
+
+    for tag, i1, i2, j1, j2 in s.get_opcodes():
+
+        if tag == 'equal':
+            truth.extend(list(gt[i1:i2]))
+            pred.extend(list(tess[j1:j2]))
+        elif tag == 'replace':
+            truth.append(gt[i1:i2])
+            pred.append(tess[j1:j2])
+        elif tag == 'delete':
+            truth.append(gt[i1:i2])
+            pred.append("!DELETE!")
+        elif tag == 'insert':
+            truth.append("!INSERT!")
+            pred.append(tess[j1:j2])
+        else:
+            print(f"Something went wrong for tag '{tag}'")
+
+    labels = list(set(truth + pred))
+    labels.sort()
+    cm = confusion_matrix(y_true=truth, y_pred=pred, labels=labels)
+    cm = pd.DataFrame(columns=labels, index=labels, data=cm)
+    if sort_by_confusion:
+        confusions = cm.values.sum(axis=0) - cm.values.diagonal()
+        ind = np.argsort(-confusions)
+        cm = cm.iloc[ind, ind]
+    return cm

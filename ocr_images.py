@@ -75,6 +75,8 @@ arg_parser.add_argument('--tessdata', default='dataRES_SCALING+BLUR',
                              'BLUR is replaced by the blur amount')
 arg_parser.add_argument('-w', '--wmetrics', action='store_true',
                         help='Produce word-level metrics for image')
+arg_parser.add_argument('-cm', '--confusion_matrix', action='store_true',
+                        help='Produce confusion matrix for whole page')
 arg_parser.add_argument('image', help='Image to process')
 
 args = arg_parser.parse_args()
@@ -174,7 +176,8 @@ for scaling in scalings:
                '-c', 'low_resolution_dpi=%d' % args.resolution,
                '-c', 'low_resolution_scaling=%d' % scaling_type[0],
                '-c', 'low_resolution_blurring=%s' % blur,
-               '--psm', '6',
+               '-c', 'lstm_dump_softmax=true',
+               '--psm', '4',
                imggbase + ext, imgout, 'txt', 'hocr']
         if debug:
             print('About to run: %s' % ' '.join(cmd), file=sys.stderr)
@@ -208,6 +211,11 @@ else:
     out123txt = parse_hocr.ocr_page_to_text(out123)
     with open(outbase + '-merged-%s.txt' % scalingsstr, 'w') as mergedtxt:
         print(out123txt, file=mergedtxt)
+
+    if args.confusion_matrix:
+        cm = hocr_metrics.get_confusion_matrix(gt, out123txt, sort_by_confusion=True)
+        cm_csv = f'{outbase}-merged-{scalingsstr}-confusion.csv'
+        cm.to_csv(cm_csv, mode='w')
 
     if gt is not None:
         mergedfile = outbase + '-merged-%s.metrics' % scalingsstr
