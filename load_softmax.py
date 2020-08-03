@@ -151,17 +151,87 @@ def test_align_boxes(boxes, links):
         for j in links[i]:
             out = vertical_union(boxes[j], out)
         out_boxes.append(out)
+    out_boxes = np.array(out_boxes)
+    ind = np.argsort(out_boxes[:, 1])
+    out_boxes = out_boxes[ind]
 
-    return out_boxes
+    # remove duplicates:
+    out = []
+    for i in range(len(out_boxes) - 1):
+        if not np.array_equal(out_boxes[i], out_boxes[i + 1]):
+            out.append(out_boxes[i])
+    out.append(out_boxes[-1])
+
+    return np.array(out)
+
+
+def page_shaddow(boxes, box_links):
+    # sort vertically
+    boxes = np.array(boxes)
+    ind = np.argsort(np.array(boxes)[:, 1])
+    page = []
+
+    for i in ind:
+        blinks = np.array(box_links[i])
+        line = boxes[blinks]
+        line_sort = np.argsort(line[:, 0])
+        blinks = blinks[line_sort]
+        page.append(blinks)
+
+    # remove duplicates:
+    out = []
+    for i in range(len(page) - 1):
+        if not np.array_equal(page[i], page[i+1]):
+            out.append(page[i])
+    out.append(page[-1])
+
+    return out
+
+
+def create_text(files):
+    bboxes = [f['bbox'] for f in files]
+    box_links = align_boxes(bboxes, iou_thresh=0.6)
+
+    aligned_boxes = test_align_boxes(bboxes, box_links)
+    page = page_shaddow(bboxes, box_links)
+    assert len(aligned_boxes) == len(page), f"Number of aligned boxes ({len(aligned_boxes)}) " \
+                                            f"doesn't equal number of lines in page ({len(page)})!"
+
+    text = ""
+
+    def append_text(arr):
+        t = ""
+        for i in arr:
+            t += files[i]['text']
+        return t
+
+    def blank_line(l):
+        height = aligned_boxes[l][3] - aligned_boxes[l][1]
+        diff = aligned_boxes[l][1] - aligned_boxes[l-1][3]
+        if diff > height / 2:
+            return True
+        else:
+            return False
+
+    for line, arr in enumerate(page):
+        text += append_text(arr)
+        if line > 0 and blank_line(line):
+            text += "\n"
+        text += "\n"
+
+    return text
 
 
 if __name__ == "__main__":
     base = "/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/supreme-court/Softmax/"
     head = "/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/header.txt"
     files = collect_files(base, head)
+
+    print(create_text(files))
+
+    # visually test alignment
+
     bboxes = [f['bbox'] for f in files]
-
-    img = plt.imread("/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/supreme-court/supreme-court-Times-New-Roman-page1.png")
     box_links = align_boxes(bboxes, iou_thresh=0.6)
-
+    img = plt.imread("/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/supreme-court/supreme-court-Times-New-Roman-page1.png")
     draw_text_with_boxes(img, test_align_boxes(bboxes, box_links))
