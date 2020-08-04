@@ -19,25 +19,34 @@ def draw_figure(canvas, figure):
     return figure_canvas_agg
 
 
-def softmax_gui(file, image_path):
+def softmax_gui(file, image_path, lowres=False):
     # crop tesseract line segmentation
     img = plt.imread(image_path)
     x1, y1, x2, y2 = file['bbox']
+
+    if lowres:
+        img_lowres = plt.imread(image_path[:-4] + "-simulated-60dpi.png")
+        x1 = (x1 * img_lowres.shape[1]) // img.shape[1]
+        x2 = (x2 * img_lowres.shape[1]) // img.shape[1]
+        y1 = (y1 * img_lowres.shape[0]) // img.shape[0]
+        y2 = (y2 * img_lowres.shape[0]) // img.shape[0]
+        img = img_lowres
+
     box = img[y1:y2, x1:x2]
-    figsize = ((x2 - x1) // 100, 1)
+    figsize = (10, 1)
     softmax_width = len(file['data'])
     scale = (x2 - x1) / softmax_width
 
-    # Define the window layout
     layout = [
         [sg.Text(f"Tesseract Output: {file['text']}")],
         [sg.Canvas(key="-CANVAS-")],
+        [sg.Slider(key="-SLIDER-", orientation='horizontal', range=(0, softmax_width - 1),
+                   size=(figsize[0] * 9, 20), enable_events=True)],
         [sg.Text("Tesseract Softmax Outputs")],
         [sg.Canvas(key="-SOFTMAX-")],
-        [sg.Slider(key="-SLIDER-", orientation='horizontal', range=(0, softmax_width - 1),
-                   size=(figsize[0]*8, 20), enable_events=True)],
         [sg.Button("Exit / Next")],
     ]
+    # Define the window layout
 
     # Create the form and show it without the plot
     window = sg.Window(

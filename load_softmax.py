@@ -51,4 +51,4 @@ if __name__ == "__main__":
 
     # visual tests
     for file in files:
-        gui.softmax_gui(file, img_path)
+        gui.softmax_gui(file, img_path, lowres=True)
