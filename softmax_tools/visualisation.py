@@ -11,7 +11,7 @@ def get_line_image(ax, box, scale, softmax_pos=None):
     ax.imshow(box, cmap='gray', vmin=0, vmax=1, aspect=1)
     ax.set_axis_off()
 
-    rec = Rectangle((softmax_pos*scale - scale // 2, 0), scale, box.shape[0], fill=True, alpha=0.2, color="r")
+    rec = Rectangle((softmax_pos*scale, 0), scale, box.shape[0], fill=True, alpha=0.2, color="r")
     ax.add_patch(rec)
 
     plt.tight_layout()

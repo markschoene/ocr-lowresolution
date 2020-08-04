@@ -50,5 +50,9 @@ if __name__ == "__main__":
     print(create_text(files))
 
     # visual tests
-    for file in files:
-        gui.softmax_gui(file, img_path, lowres=True)
+    bboxes = [f['bbox'] for f in files]
+    box_links = boxes.align_boxes(bboxes, iou_thresh=0.6)
+    page = boxes.page_shaddow(bboxes, box_links)
+    for arr in page:
+        for line in arr:
+            gui.softmax_gui(files[line], img_path, lowres=True)
