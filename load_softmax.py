@@ -2,7 +2,7 @@
 import matplotlib.pyplot as plt
 
 # Softmax Library
-from softmax_tools import visualisation as visuals
+from softmax_tools import gui
 from softmax_tools import io
 from softmax_tools import boxes
 
@@ -44,13 +44,11 @@ def create_text(files):
 if __name__ == "__main__":
     base = "/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/supreme-court/Softmax/"
     head = "/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/header.txt"
+    img_path = "/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/supreme-court/supreme-court-Times-New-Roman-page1.png"
     files = io.collect_files(base, head)
 
     print(create_text(files))
 
-    # visually test alignment
-
-    bboxes = [f['bbox'] for f in files]
-    box_links = boxes.align_boxes(bboxes, iou_thresh=0.6)
-    img = plt.imread("/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/supreme-court/supreme-court-Times-New-Roman-page1.png")
-    visuals.draw_text_with_boxes(img, boxes.test_align_boxes(bboxes, box_links))
+    # visual tests
+    for file in files:
+        gui.softmax_gui(file, img_path)
