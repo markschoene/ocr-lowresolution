@@ -45,9 +45,8 @@ def recognize_line(df):
     return sequences[0]
 
 
-def decode_sequence(sequence, header, sess):
-    assert sess, "No tensorflow session passed"
-    characters = header[sequence.eval()[0]].to_list()
+def decode_sequence(sequence, header):
+    characters = header[sequence.numpy()[0]].to_list()
     decoded = "".join(characters)
 
     return decoded
@@ -55,14 +54,13 @@ def decode_sequence(sequence, header, sess):
 
 def collect_files(base_path, head_path):
     files = []
-    with tf.Session() as sess:
-        for file in os.listdir(base_path):
-            file_path = os.path.join(base_path, file)
-            df, bbox = read_line(line_path=file_path, head_path=head_path)
+    for file in os.listdir(base_path):
+        file_path = os.path.join(base_path, file)
+        df, bbox = read_line(line_path=file_path, head_path=head_path)
 
-            seq = recognize_line(df)
+        seq = recognize_line(df)
 
-            file = {"data": df, "bbox": bbox, "text": decode_sequence(seq, df.columns, sess)}
-            files.append(file)
+        file = {"data": df, "bbox": bbox, "text": decode_sequence(seq, df.columns)}
+        files.append(file)
 
     return files
