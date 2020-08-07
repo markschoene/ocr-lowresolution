@@ -8,6 +8,7 @@ from softmax_tools import boxes
 
 
 def get_line_image(ax, box, scale, softmax_pos=None):
+    ax.clear()
     ax.imshow(box, cmap='gray', vmin=0, vmax=1, aspect=1)
     ax.set_axis_off()
 
@@ -19,6 +20,7 @@ def get_line_image(ax, box, scale, softmax_pos=None):
 
 
 def plot_probabilities(ax, df, pos, topk):
+    ax.clear()
     probs = df.iloc[pos].sort_values()[-topk:]
     labels = probs.index[::-1].to_list()
     x = np.arange(topk)

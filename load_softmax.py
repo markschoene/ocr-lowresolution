@@ -73,12 +73,11 @@ def loop_mistakes(files, img_path):
             # open gui window
             gui.softmax_gui(files[line], img_path, lowres=True)
 
+
 if __name__ == "__main__":
     base = "/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/supreme-court/Softmax/"
     head = "/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/header.txt"
     img_path = "/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/supreme-court/supreme-court-Times-New-Roman-page1.png"
     files = io.collect_files(base, head)
 
-    # visual tests
-    #loop_page(files, img_path)
-    loop_mistakes(files, img_path)
+    gui.softmax_gui(files, img_path, figsize=(10, 1), lowres=True)
