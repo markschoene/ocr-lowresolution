@@ -1,5 +1,6 @@
 # Python Library
 import time
+import difflib
 import PySimpleGUI as sg
 import matplotlib
 import matplotlib.pyplot as plt
@@ -162,7 +163,24 @@ def softmax_gui(files, image_path, figsize, lowres=False):
                             figsize=figsize)
 
         elif event == "Next Mistake":
-            pass
+            # loop till next mistake
+            while True:
+                n_iter += 1
+                pred = files[line_list[n_iter]]['text']
+                s = difflib.SequenceMatcher(None, gt, pred, autojunk=False)
+
+                # filter correct reads
+                i, j, k = s.find_longest_match(0, len(gt), 0, len(pred))
+                if k != len(pred):
+                    break
+
+            # execute newline
+            current_state['file'] = files[line_list[n_iter]]
+            new_line_window(canvas1=window["-CANVAS-"].TKCanvas,
+                            canvas2=window["-SOFTMAX-"].TKCanvas,
+                            state=current_state,
+                            image_path=image_path,
+                            figsize=figsize)
 
         elif event == "Toggle Resolution":
             pass

@@ -42,42 +42,13 @@ def create_text(files):
     return text, page
 
 
-def loop_page(files, img_path):
-    bboxes = [f['bbox'] for f in files]
-    box_links = boxes.align_boxes(bboxes, iou_thresh=0.6)
-    page = boxes.page_shaddow(bboxes, box_links)
-    for arr in page:
-        for line in arr:
-            gui.softmax_gui(files[line], img_path, lowres=True)
-
-
-def loop_mistakes(files, img_path):
-    ground_truth_path = img_path.replace(".png", ".gt.txt")
-    with open(ground_truth_path, "r") as f:
-        gt = f.read()
-
-    bboxes = [f['bbox'] for f in files]
-    box_links = boxes.align_boxes(bboxes, iou_thresh=0.6)
-    page = boxes.page_shaddow(bboxes, box_links)
-
-    for arr in page:
-        for line in arr:
-            pred = files[line]['text']
-            s = difflib.SequenceMatcher(None, gt, pred, autojunk=False)
-
-            # filter correct reads
-            i, j, k = s.find_longest_match(0, len(gt), 0, len(pred))
-            if k == len(pred):
-                continue
-
-            # open gui window
-            gui.softmax_gui(files[line], img_path, lowres=True)
-
-
 if __name__ == "__main__":
     base = "/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/supreme-court/Softmax/"
     head = "/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/header.txt"
     img_path = "/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/supreme-court/supreme-court-Times-New-Roman-page1.png"
     files = io.collect_files(base, head)
+
+    t, p = create_text(files)
+    print(t)
 
     gui.softmax_gui(files, img_path, figsize=(10, 1), lowres=True)
