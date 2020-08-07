@@ -21,7 +21,7 @@ def draw_figure(canvas, figure):
     return figure_canvas_agg
 
 
-def new_line_window(canvas1, canvas2, state, image_path, figsize):
+def new_line_window(canvas1, canvas2, text_field, state, image_path, figsize):
     file = state['file']
     # crop tesseract line segmentation
     img = plt.imread(image_path)
@@ -64,6 +64,9 @@ def new_line_window(canvas1, canvas2, state, image_path, figsize):
     state['slider_range'] = (0, softmax_width - 1)
     state['slider'].update(value=0, range=state['slider_range'])
 
+    # update tesseract text
+    text_field.Update(value=file['text'])
+
 
 # shows position of slider in image
 def slide(state, pos):
@@ -88,6 +91,7 @@ def softmax_gui(files, image_path, figsize, lowres=False):
     # Define the window layout
     layout = [
         [sg.Text("Tesseract Output:")],
+        [sg.Text(200*" ", key="-TESSTEXT-")],
         [sg.Canvas(key="-CANVAS-")],
         [sg.Slider(key="-SLIDER-", orientation='horizontal', range=(0, 100),
                    size=(figsize[0] * 9, 20), enable_events=True)],
@@ -128,6 +132,7 @@ def softmax_gui(files, image_path, figsize, lowres=False):
 
     new_line_window(canvas1=window["-CANVAS-"].TKCanvas,
                     canvas2=window["-SOFTMAX-"].TKCanvas,
+                    text_field=window["-TESSTEXT-"],
                     state=current_state,
                     image_path=image_path,
                     figsize=figsize)
@@ -158,6 +163,7 @@ def softmax_gui(files, image_path, figsize, lowres=False):
             current_state['file'] = files[line_list[n_iter]]
             new_line_window(canvas1=window["-CANVAS-"].TKCanvas,
                             canvas2=window["-SOFTMAX-"].TKCanvas,
+                            text_field=window["-TESSTEXT-"],
                             state=current_state,
                             image_path=image_path,
                             figsize=figsize)
@@ -178,6 +184,7 @@ def softmax_gui(files, image_path, figsize, lowres=False):
             current_state['file'] = files[line_list[n_iter]]
             new_line_window(canvas1=window["-CANVAS-"].TKCanvas,
                             canvas2=window["-SOFTMAX-"].TKCanvas,
+                            text_field=window["-TESSTEXT-"],
                             state=current_state,
                             image_path=image_path,
                             figsize=figsize)
