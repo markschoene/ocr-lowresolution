@@ -1,5 +1,5 @@
 # Python Library
-import numpy as np
+import time
 import PySimpleGUI as sg
 import matplotlib
 import matplotlib.pyplot as plt
@@ -87,18 +87,19 @@ def softmax_gui(file, image_path, lowres=False):
         # adjust slider
         val = int(values['-SLIDER-'])
         if event == '-SLIDER-':
-
             slide(val)
 
         elif event == "Left:113" and val > 0:
             val -= 1
             window["-SLIDER-"].update(value=val)
             slide(val)
+            time.sleep(0.15)
 
         elif event == "Right:114" and val < softmax_width - 1:
             val += 1
             window["-SLIDER-"].update(value=val)
             slide(val)
+            time.sleep(0.15)
 
         # End program if user closes window or
         # presses the OK button
