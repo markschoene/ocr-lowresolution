@@ -1,66 +1,46 @@
 import os
 import pandas as pd
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras.backend import ctc_decode
 
-numchar = 111
+from .page_data import Document
 
 
-def load_line_data(path):
-    softmax = np.fromfile(path, dtype=np.float32).reshape(-1, numchar)
+def read_header(path):
+    """
+    Read the header file that labels tesseract softmax outputs
 
-    return softmax
-
-
-def load_header(path):
+    :param path: path to the file 'header.txt'
+    :return: list of characters
+    """
     with open(path, "r") as f:
         file_list = f.readlines()
-    header = []
 
-    for line in file_list:
-        header.append(line[:-1])
+    header = [line[:-1] for line in file_list]
 
     return header
 
 
-def read_line(line_path, head_path):
-    fn_split = os.path.basename(line_path)[:-4].split('-')
-    bounding_box = [int(s) for s in fn_split[2:]]
-    assert len(bounding_box) == 4, "bounding box has more than 4 coordinates. Infering bbox from filename did not work."
+def get_softmax_files(base_path, image_base, scalings, header):
+    """
+    Get a list of softmax output files corresponding to a scaling method
 
-    softmax = load_line_data(line_path)
-    header = load_header(head_path)
-    df = pd.DataFrame(columns=header, data=softmax)
+    :param base_path: path to the softmax output base
+    :param scalings: e.g. L0, C0, B0, B05, B1, B15, B2
+    :param header: list labelling the output file columns
+    :return: dictionary containing documents as keys and lists as values.
+             These lists are made up of lists containing file dicts
+    """
+    outfiles = {}
+    directories = [d for d in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, d))]
+    print(f"Collecting files from: {', '.join(directories)}")
 
-    return df, bounding_box
+    for d in directories:
+        doc = Document(name=d, tess_base=base_path, image_base=image_base)
 
+        for file in sorted(os.listdir(doc.root)):
+            if '.bin' in file and scalings in file:
 
-def recognize_line(df):
-    pred = np.expand_dims(df.values, axis=0)
-    length = np.array([pred.shape[1]])
+                doc.add_file(file, header)
+        outfiles[d] = doc
 
-    sequences, _ = ctc_decode(y_pred=pred, input_length=length, greedy=True)
-
-    return sequences[0]
-
-
-def decode_sequence(sequence, header):
-    characters = header[sequence.numpy()[0]].to_list()
-    decoded = "".join(characters)
-
-    return decoded
-
-
-def collect_files(base_path, head_path):
-    files = []
-    for file in os.listdir(base_path):
-        file_path = os.path.join(base_path, file)
-        df, bbox = read_line(line_path=file_path, head_path=head_path)
-
-        seq = recognize_line(df)
-
-        file = {"data": df, "bbox": bbox, "text": decode_sequence(seq, df.columns)}
-        files.append(file)
-
-    return files
+    return outfiles
