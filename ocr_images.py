@@ -77,6 +77,8 @@ arg_parser.add_argument('-w', '--wmetrics', action='store_true',
                         help='Produce word-level metrics for image')
 arg_parser.add_argument('-cm', '--confusion_matrix', action='store_true',
                         help='Produce confusion matrix for whole page')
+arg_parser.add_argument('--softmax', action='store_true',
+                        help="Dumps softmax layers to 'outbase/Softmax'")
 arg_parser.add_argument('image', help='Image to process')
 
 args = arg_parser.parse_args()
@@ -170,19 +172,34 @@ for scaling in scalings:
 
         ddir = os.path.join(args.tessdata_path, ddir, 'eng')
         os.environ['TESSDATA_PREFIX'] = ddir
+
+        dump_softmax = 'true' if args.softmax else 'false'
+
         cmd = [tessbin,
                '--dpi', '300', '-l', 'eng',
                '-c', 'low_resolution_input=true',
                '-c', 'low_resolution_dpi=%d' % args.resolution,
                '-c', 'low_resolution_scaling=%d' % scaling_type[0],
                '-c', 'low_resolution_blurring=%s' % blur,
-               '-c', 'lstm_dump_softmax=true',
+               '-c', 'lstm_dump_softmax=%s' % dump_softmax,
                '--psm', '4',
                imggbase + ext, imgout, 'txt', 'hocr']
         if debug:
             print('About to run: %s' % ' '.join(cmd), file=sys.stderr)
             print('TESSDATA_PREFIX = %s' % ddir)
         subprocess.run(cmd, check=True)
+
+        # collect softmax outputs
+        if args.softmax:
+            softmax_dir = os.path.join(imgdir, "Softmax")
+            for softmax_file in os.listdir(softmax_dir):
+                if os.path.isfile(os.path.join(softmax_dir, softmax_file)):
+                    move_softmax_files = ['mv',
+                                          os.path.join(softmax_dir, softmax_file),
+                                          os.path.join(os.path.dirname(imgout), "Softmax", os.path.basename(imgout) + softmax_file[11:])
+                                          ]
+                    subprocess.run(move_softmax_files)
+
     tree, tidied = parse_hocr.parse_hocr_file(imgout + '.hocr',
                                                   resolution=args.resolution)
     pages.append(tidied)

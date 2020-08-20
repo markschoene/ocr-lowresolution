@@ -43,9 +43,9 @@ def create_text(files):
 
 
 if __name__ == "__main__":
-    base = "/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/supreme-court/Softmax/"
-    head = "/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/header.txt"
-    img_path = "/home/mark/Workspace/CMP_OCR_NLP/simulated-sources/supreme-court/supreme-court-Times-New-Roman-page1.png"
+    base = "/home/mark/Desktop/CMP Summer Project/simulated-training/deep-learning-footprint/Softmax/"
+    head = "/home/mark/Desktop/CMP Summer Project/simulated-training/header.txt"
+    img_path = "/home/mark/Desktop/CMP Summer Project/simulated-training/deep-learning-footprint/deep-learning-footprint-century-gothic-page1.png"
     files = io.collect_files(base, head)
 
     t, p = create_text(files)
