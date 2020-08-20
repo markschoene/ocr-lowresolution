@@ -59,16 +59,18 @@ def main(tess_base, image_base, scalings, visualize=False):
     # decode lines
     decoder = CTCDecoderKeras()
     for _, doc in softmax_files.items():
-        for page in doc.pages:
-            for file in page['files']:
-                text = decoder.decode_line(file['data'])
-                file['text'] = text
+        for font, p in doc.fonts.items():
+            pages = p['pages']
+            for page in pages:
+                for file in page['files']:
+                    text = decoder.decode_line(file['data'])
+                    file['text'] = text
 
-            t, p = create_text(page['files'], page['img'])
-            print(t)
+                t, p = create_text(page['files'], page['img'])
+                print(t)
 
-            if visualize:
-                gui.softmax_gui(page['files'], page['img'], figsize=(10, 1), lowres=True)
+                if visualize:
+                    gui.softmax_gui(page['files'], page['img'], figsize=(10, 1), lowres=True)
 
 
 if __name__ == "__main__":

@@ -27,9 +27,7 @@ class Document(object):
         self.tess_base = tess_base
         self.image_base = image_base
         self.root = os.path.join(tess_base, name, 'Softmax')
-        self.fonts = set()
-        self.pages = list()
-        self.page_numbers = list()
+        self.fonts = dict()
 
     def add_file(self, file_name, header):
 
@@ -39,33 +37,38 @@ class Document(object):
         font = font.replace(self.name + '-', '')
         page_index = int(page_index.split('-')[0])
 
+        if font not in self.fonts.keys():
+            self.fonts[font] = {'pages': [], 'page_numbers': []}
+
         img_name = self.name + '-' + font + '-page' + str(page_index) + '.png'
         img_path = os.path.join(self.image_base, self.name, img_name)
-        self.add_page(page_index, img_path)
+        self.add_page(font, page_index, img_path)
 
         df, bbox = read_line(file_path, header)
         out = {'path': file_path, 'font': font, 'page': page_index, 'data': df, 'bbox': bbox}
-        self.pages[page_index - 1]['files'].append(out)
+        self.fonts[font]['pages'][page_index - 1]['files'].append(out)
 
-    def add_page(self, page_index, image_path):
+    def add_page(self, font, page_index, image_path):
         """
         If page_index is not a page yet, all pages between max(current pages) and page_index.
+        :param font: font that the page is written in
         :param page_index: Page number to add
         :param image_path: path to the image file of this page number
         :return:
         """
-        if page_index not in self.page_numbers:
+        if page_index not in self.fonts[font]['page_numbers']:
             p = {'files': [], 'img': image_path}
-            if self.pages:
-                for i in range(max(self.page_numbers) + 1, page_index + 1):
+            if self.fonts[font]['pages']:
+                for i in range(max(self.fonts[font]['page_numbers']) + 1, page_index + 1):
 
-                    self.pages.append(p)
-                    self.page_numbers.append(i)
+                    self.fonts[font]['pages'].append(p)
+                    self.fonts[font]['page_numbers'].append(i)
             else:
-                self.pages.append(p)
-                self.page_numbers.append(page_index)
+                self.fonts[font]['pages'].append(p)
+                self.fonts[font]['page_numbers'].append(page_index)
 
-        assert self.page_numbers == list(range(min(self.page_numbers), max(self.page_numbers) + 1))
+        assert self.fonts[font]['page_numbers'] == list(range(min(self.fonts[font]['page_numbers']),
+                                                              max(self.fonts[font]['page_numbers']) + 1))
 
     def check_missing_pages(self):
         pass
