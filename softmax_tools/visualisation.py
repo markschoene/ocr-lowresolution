@@ -51,3 +51,25 @@ def draw_text_with_boxes(img, bboxes):
         ax.add_patch(rec)
 
     plt.show()
+
+
+def draw_segmentation(ax, img, index, files, h_scale=1, v_scale=1):
+    ax.clear()
+    ax.imshow(img, cmap='gray', vmin=0, vmax=1, aspect=1)
+    ax.set_axis_off()
+
+    for i, file in enumerate(files):
+        x1, y1, x2, y2 = file['bbox']
+        x1, x2 = int(x1 * h_scale), int(x2 * h_scale)
+        y1, y2 = int(y1 * v_scale), int(y2 * v_scale)
+
+        color = 'r' if i == index else 'g'
+        fill = True if i == index else False
+        alpha = 0.2 if i == index else 1
+
+        rec = Rectangle((x1, y1), x2 - x1, y2 - y1, fill=fill, color=color, alpha=alpha)
+        ax.add_patch(rec)
+
+    plt.tight_layout()
+
+    return ax

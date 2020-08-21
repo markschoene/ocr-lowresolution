@@ -21,24 +21,28 @@ def draw_figure(canvas, figure):
     return figure_canvas_agg
 
 
-def new_line_window(canvas1, canvas2, text_field, state, image_path, figsize):
+def new_line_window(canvas1, canvas2, canvas_segmentation, files, text_field, state, image_path, figsize, lines):
     file = state['file']
     # crop tesseract line segmentation
     img = plt.imread(image_path)
     x1, y1, x2, y2 = file['bbox']
 
+    h_scale, v_scale = 1, 1
     if state['low-resolution']:
         img_lowres = plt.imread(image_path[:-4] + "-simulated-60dpi.png")
-        x1 = (x1 * img_lowres.shape[1]) // img.shape[1]
-        x2 = (x2 * img_lowres.shape[1]) // img.shape[1]
-        y1 = (y1 * img_lowres.shape[0]) // img.shape[0]
-        y2 = (y2 * img_lowres.shape[0]) // img.shape[0]
+        h_scale = img_lowres.shape[1] / img.shape[1]
+        x1 = int(x1 * h_scale)
+        x2 = int(x2 * h_scale)
+
+        v_scale = img_lowres.shape[0] / img.shape[0]
+        y1 = int(y1 * v_scale)
+        y2 = int(y2 * v_scale)
+
         img = img_lowres
 
     state['box'] = img[y1:y2, x1:x2]
     softmax_width = len(file['data'])
     state['scale'] = (x2 - x1) / softmax_width
-
     # Add the image to the first canvas
     if 'text_figure' in state.keys():
         visuals.get_line_image(state['text_ax'], state['box'], state['scale'], softmax_pos=0)
@@ -67,6 +71,20 @@ def new_line_window(canvas1, canvas2, text_field, state, image_path, figsize):
     # update tesseract text
     text_field.Update(value=file['text'])
 
+    # Add image to the segmentation canvas
+    if 'segmentation_figure' in state.keys():
+        visuals.draw_segmentation(ax=state['segmentation_ax'],
+                                  img=img, index=lines[state['n_iter']],
+                                  files=files, h_scale=h_scale, v_scale=v_scale)
+        state['segmentation_figure'].draw()
+    else:
+        seg, ax3 = plt.subplots(1, 1, figsize=(4, 6))
+        visuals.draw_segmentation(ax=ax3, img=img, index=lines[state['n_iter']],
+                                  files=files, h_scale=h_scale, v_scale=v_scale)
+        canvas_segmentation_fig = draw_figure(canvas_segmentation, seg)
+        state['segmentation_figure'] = canvas_segmentation_fig
+        state['segmentation_ax'] = ax3
+
 
 # shows position of slider in image
 def slide(state, pos):
@@ -89,7 +107,7 @@ def slide(state, pos):
 
 def softmax_gui(files, image_path, figsize, lowres=False):
     # Define the window layout
-    layout = [
+    softmax_column = [
         [sg.Text("Tesseract Output:")],
         [sg.Text(200*" ", key="-TESSTEXT-")],
         [sg.Canvas(key="-CANVAS-")],
@@ -98,6 +116,18 @@ def softmax_gui(files, image_path, figsize, lowres=False):
         [sg.Text("Tesseract Softmax Outputs")],
         [sg.Canvas(key="-SOFTMAX-")],
         [sg.Button("Next Line"), sg.Button("Next Mistake"), sg.Button("Toggle Resolution"), sg.Button("Exit")],
+    ]
+    segmentation_column = [
+        [
+            sg.Canvas(key="-SEGMENTATION-")
+        ]
+    ]
+    layout = [
+        [
+            sg.Column(segmentation_column),
+            sg.VSeparator(),
+            sg.Column(softmax_column),
+        ]
     ]
 
     # Create the form and show it without the plot
@@ -121,21 +151,24 @@ def softmax_gui(files, image_path, figsize, lowres=False):
     page = boxes.page_shaddow(bboxes, box_links)
     line_list = [i for arr in page for i in arr]
 
-    n_iter = 0
-    current_state = {"file": files[line_list[n_iter]],
+    current_state = {"file": files[line_list[0]],
                      "slider": window["-SLIDER-"],
                      "slider_range": (0, 100),
                      "slider_pos": 0,
                      "topk": 10,
                      "scale": 1,
+                     "n_iter": 0,
                      "low-resolution": lowres}
 
     new_line_window(canvas1=window["-CANVAS-"].TKCanvas,
                     canvas2=window["-SOFTMAX-"].TKCanvas,
+                    canvas_segmentation=window["-SEGMENTATION-"].TKCanvas,
+                    files=files,
                     text_field=window["-TESSTEXT-"],
                     state=current_state,
                     image_path=image_path,
-                    figsize=figsize)
+                    figsize=figsize,
+                    lines=line_list)
 
     # Create an event loop
     while True:
@@ -159,20 +192,23 @@ def softmax_gui(files, image_path, figsize, lowres=False):
             time.sleep(0.15)
 
         elif event == "Next Line":
-            n_iter += 1
-            current_state['file'] = files[line_list[n_iter]]
+            current_state['n_iter'] += 1
+            current_state['file'] = files[line_list[current_state['n_iter']]]
             new_line_window(canvas1=window["-CANVAS-"].TKCanvas,
                             canvas2=window["-SOFTMAX-"].TKCanvas,
+                            canvas_segmentation=window["-SEGMENTATION-"].TKCanvas,
+                            files=files,
                             text_field=window["-TESSTEXT-"],
                             state=current_state,
                             image_path=image_path,
-                            figsize=figsize)
+                            figsize=figsize,
+                            lines=line_list)
 
         elif event == "Next Mistake":
             # loop till next mistake
             while True:
-                n_iter += 1
-                pred = files[line_list[n_iter]]['text']
+                current_state['n_iter'] += 1
+                pred = files[line_list[current_state['n_iter']]]['text']
                 s = difflib.SequenceMatcher(None, gt, pred, autojunk=False)
 
                 # filter correct reads
@@ -181,13 +217,16 @@ def softmax_gui(files, image_path, figsize, lowres=False):
                     break
 
             # execute newline
-            current_state['file'] = files[line_list[n_iter]]
+            current_state['file'] = files[line_list[current_state['n_iter']]]
             new_line_window(canvas1=window["-CANVAS-"].TKCanvas,
                             canvas2=window["-SOFTMAX-"].TKCanvas,
+                            canvas_segmentation=window["-SEGMENTATION-"].TKCanvas,
+                            files=files,
                             text_field=window["-TESSTEXT-"],
                             state=current_state,
                             image_path=image_path,
-                            figsize=figsize)
+                            figsize=figsize,
+                            lines=line_list)
 
         elif event == "Toggle Resolution":
             pass
