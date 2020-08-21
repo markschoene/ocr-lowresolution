@@ -15,10 +15,9 @@ def create_text(files, img_path):
     box_links = boxes.align_boxes(bboxes, iou_thresh=0.6)
 
     aligned_boxes = boxes.test_align_boxes(bboxes, box_links)
-    visualisation.test_box_alignment(files, img_path)
     page = boxes.page_shaddow(bboxes, box_links)
-    #assert len(aligned_boxes) == len(page), f"Number of aligned boxes ({len(aligned_boxes)}) " \
-    #                                        f"doesn't equal number of lines in page ({len(page)})!"
+    assert len(aligned_boxes) == len(page), f"Number of aligned boxes ({len(aligned_boxes)}) " \
+                                            f"doesn't equal number of lines in page ({len(page)})!"
 
     text = ""
 
