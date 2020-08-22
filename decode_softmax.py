@@ -7,7 +7,7 @@ from softmax_tools import gui
 from softmax_tools import io
 from softmax_tools import boxes
 from softmax_tools import visualisation
-from softmax_tools.decoder import CTCDecoderKeras
+from softmax_tools.decoder import CTCDecoder
 
 
 def create_text(files, img_path):
@@ -44,7 +44,7 @@ def create_text(files, img_path):
     return text, page
 
 
-def main(tess_base, image_base, scalings, visualize=False):
+def main(tess_base, image_base, scalings, beam_width, visualize=False):
 
     # read header to label tesseract softmax outputs
     head_path = os.path.join(os.path.dirname(image_base), 'header.txt')
@@ -56,13 +56,13 @@ def main(tess_base, image_base, scalings, visualize=False):
                                          scalings=scalings,
                                          header=header)
     # decode lines
-    decoder = CTCDecoderKeras()
+    decoder = CTCDecoder()
     for _, doc in softmax_files.items():
         for font, p in doc.fonts.items():
             pages = p['pages']
             for page in pages:
                 for file in page['files']:
-                    text = decoder.decode_line(file['data'])
+                    text = decoder.decode_line(file['data'], beam_width=beam_width)
                     file['text'] = text
 
                 t, p = create_text(page['files'], page['img'])
@@ -78,13 +78,16 @@ if __name__ == "__main__":
     arg_parser.add_argument('-b', '--tess_base', required=True,
                             help='base directory containing folders with processed tesseract outputs')
     arg_parser.add_argument('-i', '--image_base', required=True,
-                            help='base directory for ')
+                            help='base directory for simulated images')
     arg_parser.add_argument('-s', '--scalings', default='C0',
                             help='scalings to use, e.g. L0, C0, B0, B05, B1, B15, B2')
+    arg_parser.add_argument('-bw', '--beam_width', default=30,
+                            help='beam width for ctc decoder')
 
     args = arg_parser.parse_args()
 
     main(tess_base=args.tess_base,
          image_base=args.image_base,
          scalings=args.scalings,
-         visualize=True)
+         beam_width=args.beam_width,
+         visualize=False)
