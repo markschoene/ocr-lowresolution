@@ -108,8 +108,16 @@ class CTCDecoder(Decoder):
                 new_beams[i, :t] = beams[root, :t]
                 new_beams[i, t] = new_char
 
-            beams = np.array(new_beams)
+        # check if any two yield same output and add their
+        reduced_beams = []
+        for i in range(beam_width):
+            reduced_beam = self.reduce_sequence(beams[i], null_char)
+            for j in range(len(reduced_beams)):
+                if reduced_beams and len(reduced_beam) == len(reduced_beams[j]) and (reduced_beam == reduced_beams[j]).all():
+                    beam_scores[j, 0] += beam_scores[i, 0]
+            reduced_beams.append(reduced_beam)
 
-        top_beam = self.reduce_sequence(beams[0], null_char)
+        ind = np.argsort(-beam_scores.flatten())
+        top_beam = self.reduce_sequence(beams[ind[0]], null_char)
 
         return self._decode_sequence(top_beam, df.columns)  # returns only top beam
