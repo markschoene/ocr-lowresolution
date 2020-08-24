@@ -42,7 +42,7 @@ if __name__ == "__main__":
                             help='base directory for simulated images')
     arg_parser.add_argument('-s', '--scalings', default='C0',
                             help='scalings to use, e.g. L0, C0, B0, B05, B1, B15, B2')
-    arg_parser.add_argument('-bw', '--beam_width', default=30,
+    arg_parser.add_argument('-bw', '--beam_width', default=30, type=int,
                             help='beam width for ctc decoder')
 
     args = arg_parser.parse_args()
