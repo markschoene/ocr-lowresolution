@@ -7,7 +7,7 @@ from io import StringIO
 from hocr_metrics import get_metrics
 
 
-def eval_docs(doc_list):
+def eval_docs(doc_list, scalings, decoder_name):
     out = {}
     tessbase = ""
     for _, doc in doc_list.items():
@@ -34,5 +34,5 @@ def eval_docs(doc_list):
 
     for font in out.keys():
         out[font] = pd.concat(out[font])
-        outfile = os.path.join(tessbase, f'{font}-metrics.csv')
+        outfile = os.path.join(tessbase, f'{font}-{scalings}-metrics-{decoder_name}.csv')
         out[font].to_csv(outfile)

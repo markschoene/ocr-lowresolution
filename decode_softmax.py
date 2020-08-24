@@ -30,7 +30,7 @@ def main(tess_base, image_base, scalings, beam_width, visualize=False):
             for page in doc.fonts['pages']:
                 gui.softmax_gui(page['files'], page['img'], figsize=(10, 1), lowres=True)
 
-    metrics.eval_docs(softmax_files)
+    metrics.eval_docs(softmax_files, scalings, decoder.__class__.__name__)
 
 
 if __name__ == "__main__":
