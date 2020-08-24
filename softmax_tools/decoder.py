@@ -3,6 +3,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.backend import ctc_decode
 
+# Softmax Library
+from ctc_decoder import BeamSearch, BestPath
 
 class Decoder(object):
     """
@@ -63,8 +65,28 @@ class CTCDecoderKeras(Decoder):
         return self._decode_sequence(self.reduce_sequence(sequence, null_char), df.columns)
 
 
-class CTCDecoder(Decoder):
+class CTCDecoderBestPath(Decoder):
+    """
+    a wrapper for the BestPath function from the CTCDecoder package
+    https://github.com/githubharald/CTCDecoder
+    """
+    def decode_line(self, df, beam_width):
+        return BestPath.ctcBestPath(mat=df.values, classes=df.columns[:-1])
 
+
+class CTCDecoderBeamSearch(Decoder):
+    """
+    a wrapper for the BeamSearch function from the CTCDecoder package
+    https://github.com/githubharald/CTCDecoder
+    """
+    def decode_line(self, df, beam_width):
+        return BeamSearch.ctcBeamSearch(mat=df.values, classes=df.columns[:-1], lm=None, beamWidth=beam_width)
+
+
+class CTCDecoder(Decoder):
+    """
+    Manual implementation by myself (@markschoene)
+    """
     def decode_line(self, df, beam_width):
         """
         Standard CTC Decoder with beam width as specified

@@ -43,7 +43,11 @@ if __name__ == "__main__":
                             help='number of iterations that the test function is run')
     args = arg_parser.parse_args()
 
-    decoder_list = [decoder.CTCDecoder(), decoder.CTCDecoderKeras()]
+    decoder_list = [decoder.CTCDecoder(),
+                    decoder.CTCDecoderKeras(),
+                    decoder.CTCDecoderBeamSearch(),
+                    decoder.CTCDecoderBestPath]
+
     runtime = test_runtime(decoder_list=decoder_list,
                            header_path=args.header_file,
                            beam_width=args.beam_width,
