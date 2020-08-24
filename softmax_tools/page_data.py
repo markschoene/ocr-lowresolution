@@ -1,24 +1,10 @@
+# Python Library
 import os
 import numpy as np
 import pandas as pd
 
-
-def read_line(line_path, header, numchar=111):
-    """
-    Reads
-    :param line_path:
-    :param header:
-    :param numchar: number of characters to be output from tesseract. Required to read binary data.
-                    Tesseract default is 111.
-    :return: DataFrame: cols=characters, rows=timesteps, list with bounding box coordinates
-    """
-    fn_split = os.path.basename(line_path)[:-4].split('-')
-    bounding_box = [int(s) for s in fn_split[-4:]]
-
-    softmax = np.fromfile(line_path, dtype=np.float32).reshape(-1, numchar)
-    df = pd.DataFrame(columns=header, data=softmax)
-
-    return df, bounding_box
+# Softmax Library
+from softmax_tools import boxes
 
 
 class Document(object):
@@ -44,7 +30,7 @@ class Document(object):
         img_path = os.path.join(self.image_base, self.name, img_name)
         self.add_page(font, page_index, img_path)
 
-        df, bbox = read_line(file_path, header)
+        df, bbox = self.read_line(file_path, header)
         out = {'path': file_path, 'font': font, 'page': page_index, 'data': df, 'bbox': bbox}
         self.fonts[font]['pages'][page_index - 1]['files'].append(out)
 
@@ -70,5 +56,76 @@ class Document(object):
         assert self.fonts[font]['page_numbers'] == list(range(min(self.fonts[font]['page_numbers']),
                                                               max(self.fonts[font]['page_numbers']) + 1))
 
-    def check_missing_pages(self):
-        pass
+    def ocr_document(self, decoder, beam_width):
+        """
+        Uses a CTC decoder to generate human readable text from softmax files stored in this document
+        :param decoder: a CTC decoder class with method 'decode_line'
+        :param beam_width: width for beam search
+        :return:
+        """
+        print(f"Decoding outputs for {self.name}")
+
+        for font, d in self.fonts.items():
+            d['page_texts'] = []
+            for page in d['pages']:
+
+                # decode individual lines
+                for file in page['files']:
+                    text = decoder.decode_line(file['data'], beam_width=beam_width)
+                    file['text'] = text
+
+                # merge lines to full page text
+                t = self.page_text(page['files'])
+                d['page_texts'].append(t)
+
+    @staticmethod
+    def read_line(line_path, header, numchar=111):
+        """
+        Reads
+        :param line_path:
+        :param header:
+        :param numchar: number of characters to be output from tesseract. Required to read binary data.
+                        Tesseract default is 111.
+        :return: DataFrame: cols=characters, rows=timesteps, list with bounding box coordinates
+        """
+        fn_split = os.path.basename(line_path)[:-4].split('-')
+        bounding_box = [int(s) for s in fn_split[-4:]]
+
+        softmax = np.fromfile(line_path, dtype=np.float32).reshape(-1, numchar)
+        df = pd.DataFrame(columns=header, data=softmax)
+
+        return df, bounding_box
+
+    @staticmethod
+    def page_text(files):
+        bboxes = [f['bbox'] for f in files]
+        box_links = boxes.align_boxes(bboxes, iou_thresh=0.6)
+
+        aligned_boxes = boxes.test_align_boxes(bboxes, box_links)
+        page_shaddow = boxes.page_shaddow(bboxes, box_links)
+        assert len(aligned_boxes) == len(page_shaddow), f"Number of aligned boxes ({len(aligned_boxes)}) " \
+                                                f"doesn't equal number of lines in page ({len(page_shaddow)})!"
+
+        text = ""
+
+        def append_text(arr):
+            t = ""
+            for i in arr:
+                t += files[i]['text']
+            return t
+
+        def blank_line(l):
+            height = aligned_boxes[l][3] - aligned_boxes[l][1]
+            diff = aligned_boxes[l][1] - aligned_boxes[l-1][3]
+            if diff > height / 2:
+                return True
+            else:
+                return False
+
+        for line, arr in enumerate(page_shaddow):
+            text += append_text(arr)
+            if line > 0 and blank_line(line):
+                text += "\n"
+            text += "\n"
+
+        return text

@@ -1,3 +1,4 @@
+# Python Library
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.backend import ctc_decode
@@ -23,14 +24,14 @@ class Decoder(object):
         :param null_id: (int) of the null character
         :return: reduced sequence
         """
-        seq = []
+        seq = [sequence[0]]
         for item in sequence[1:]:
-            if not seq and item != null_id:
-                seq.append(item)
-            if item != null_id and item != seq[-1]:
+            if item != seq[-1]:
                 seq.append(item)
 
-        return np.array(seq)
+        seq = np.array(seq)
+        blanks = seq == null_id
+        return seq[~blanks]
 
     @staticmethod
     def _decode_sequence(sequence, header):
@@ -55,9 +56,11 @@ class CTCDecoderKeras(Decoder):
 
         pred = np.expand_dims(df.values, axis=0)
         length = np.array([pred.shape[1]])
+        null_char = df.columns.get_loc('<null>')
 
         sequences, _ = ctc_decode(y_pred=pred, input_length=length, greedy=False, beam_width=beam_width, top_paths=1)
-        return self._decode_sequence(sequences[0].numpy()[0], df.columns)
+        sequence = sequences[0].numpy()[0]
+        return self._decode_sequence(self.reduce_sequence(sequence, null_char), df.columns)
 
 
 class CTCDecoder(Decoder):
@@ -92,10 +95,11 @@ class CTCDecoder(Decoder):
             t_scores = np.log(df.iloc[t].values)
             expanded_beam_scores = np.add(np.hstack([beam_scores for i in range(num_chars)]),
                                           np.vstack([t_scores for i in range(beam_width)]))
-            ind = np.argsort(-expanded_beam_scores.flatten())
 
-            # take the top beams
+            # sort scores and pick top beams
+            ind = np.argsort(-expanded_beam_scores.flatten())
             new_beams = np.zeros_like(beams)
+
             for i in range(beam_width):
                 root = int(ind[i] / num_chars)
                 new_char = ind[i] % num_chars
