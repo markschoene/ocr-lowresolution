@@ -14,9 +14,6 @@ class Decoder(object):
     def __init__(self):
         pass
 
-    def decode_line(self, df, beam_width):
-        pass
-
     @staticmethod
     def reduce_sequence(sequence, null_id):
         """
@@ -70,7 +67,7 @@ class CTCDecoderBestPath(Decoder):
     a wrapper for the BestPath function from the CTCDecoder package
     https://github.com/githubharald/CTCDecoder
     """
-    def decode_line(self, df, beam_width):
+    def decode_line(self, df):
         return BestPath.ctcBestPath(mat=df.values, classes=df.columns[:-1])
 
 
@@ -85,9 +82,9 @@ class CTCDecoderBeamSearch(Decoder):
 
 class CTCDecoder(Decoder):
     """
-    Manual implementation by myself (@markschoene)
+    Best Path implementation
     """
-    def decode_line(self, df, beam_width):
+    def decode_line(self, df):
         """
         Standard CTC Decoder with beam width as specified
 
@@ -98,48 +95,10 @@ class CTCDecoder(Decoder):
         if len(df) == 0:
             return ""
 
-        num_chars = len(df.columns)
-        length = len(df)
-
         # init beams with <null> character
         null_char = df.columns.get_loc('<null>')
-        beams = null_char * np.ones(shape=(beam_width, length), dtype=np.int8)
-        beam_scores = np.zeros((beam_width, 1), dtype=np.float32)
 
-        # initial time step
-        t_scores = np.log(df.iloc[0].values)
-        ind = np.argsort(-t_scores)[:beam_width]
-        beams[:, 0] = ind
-        beam_scores[:, 0] = t_scores[ind]
+        best_path = np.argmax(df.values, axis=1)
+        best_path = self.reduce_sequence(best_path, null_char)
 
-        # rest of the time steps
-        for t in range(1, length):
-            t_scores = np.log(df.iloc[t].values)
-            expanded_beam_scores = np.add(np.hstack([beam_scores for i in range(num_chars)]),
-                                          np.vstack([t_scores for i in range(beam_width)]))
-
-            # sort scores and pick top beams
-            ind = np.argsort(-expanded_beam_scores.flatten())
-            new_beams = np.zeros_like(beams)
-
-            for i in range(beam_width):
-                root = int(ind[i] / num_chars)
-                new_char = ind[i] % num_chars
-
-                beam_scores[i, 0] = expanded_beam_scores[root, new_char]
-                new_beams[i, :t] = beams[root, :t]
-                new_beams[i, t] = new_char
-
-        # check if any two yield same output and add their
-        reduced_beams = []
-        for i in range(beam_width):
-            reduced_beam = self.reduce_sequence(beams[i], null_char)
-            for j in range(len(reduced_beams)):
-                if reduced_beams and len(reduced_beam) == len(reduced_beams[j]) and (reduced_beam == reduced_beams[j]).all():
-                    beam_scores[j, 0] += beam_scores[i, 0]
-            reduced_beams.append(reduced_beam)
-
-        ind = np.argsort(-beam_scores.flatten())
-        top_beam = self.reduce_sequence(beams[ind[0]], null_char)
-
-        return self._decode_sequence(top_beam, df.columns)  # returns only top beam
+        return self._decode_sequence(best_path, df.columns)  # returns only top beam

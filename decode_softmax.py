@@ -6,7 +6,7 @@ import os
 from softmax_tools import gui
 from softmax_tools import io
 from softmax_tools import metrics
-from softmax_tools.decoder import CTCDecoderBestPath
+from softmax_tools.decoder import CTCDecoder
 
 
 def main(tess_base, image_base, scalings, beam_width, visualize=False):
@@ -22,13 +22,14 @@ def main(tess_base, image_base, scalings, beam_width, visualize=False):
                                          header=header)
 
     # decode lines
-    decoder = CTCDecoderBestPath()
+    decoder = CTCDecoder()
     for _, doc in softmax_files.items():
-        doc.ocr_document(decoder, beam_width)
+        doc.ocr_document(decoder)
 
         if visualize:
-            for page in doc.fonts['pages']:
-                gui.softmax_gui(page['files'], page['img'], figsize=(10, 1), lowres=True)
+            for font, d in doc.fonts.items():
+                for page in d['pages']:
+                    gui.softmax_gui(page['files'], page['img'], figsize=(10, 1), lowres=True)
 
     metrics.eval_docs(softmax_files, scalings, decoder.__class__.__name__)
 

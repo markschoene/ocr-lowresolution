@@ -56,7 +56,7 @@ class Document(object):
         assert self.fonts[font]['page_numbers'] == list(range(min(self.fonts[font]['page_numbers']),
                                                               max(self.fonts[font]['page_numbers']) + 1))
 
-    def ocr_document(self, decoder, beam_width):
+    def ocr_document(self, decoder):
         """
         Uses a CTC decoder to generate human readable text from softmax files stored in this document
         :param decoder: a CTC decoder class with method 'decode_line'
@@ -71,7 +71,7 @@ class Document(object):
 
                 # decode individual lines
                 for file in page['files']:
-                    text = decoder.decode_line(file['data'], beam_width=beam_width)
+                    text = decoder.decode_line(file['data'])
                     file['text'] = text
 
                 # merge lines to full page text
@@ -79,11 +79,11 @@ class Document(object):
                 d['page_texts'].append(t)
 
     @staticmethod
-    def read_line(line_path, header, numchar=111):
+    def read_line(line_path, header):
         """
         Reads
-        :param line_path:
-        :param header:
+        :param line_path: path to .bin softmax file
+        :param header: list of characters labelling the .bin file
         :param numchar: number of characters to be output from tesseract. Required to read binary data.
                         Tesseract default is 111.
         :return: DataFrame: cols=characters, rows=timesteps, list with bounding box coordinates
@@ -91,7 +91,7 @@ class Document(object):
         fn_split = os.path.basename(line_path)[:-4].split('-')
         bounding_box = [int(s) for s in fn_split[-4:]]
 
-        softmax = np.fromfile(line_path, dtype=np.float32).reshape(-1, numchar)
+        softmax = np.fromfile(line_path, dtype=np.float32).reshape(-1, len(header))
         df = pd.DataFrame(columns=header, data=softmax)
 
         return df, bounding_box
