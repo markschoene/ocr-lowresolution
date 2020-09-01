@@ -21,7 +21,7 @@ def draw_figure(canvas, figure):
     return figure_canvas_agg
 
 
-def new_line_window(canvas1, canvas2, canvas_segmentation, files, text_field, state, image_path, figsize, lines):
+def new_line_window(canvas1, canvas2, canvas_segmentation, files, text_field, bbox_field, state, image_path, figsize, lines):
     file = state['file']
     # crop tesseract line segmentation
     img = plt.imread(image_path)
@@ -71,6 +71,9 @@ def new_line_window(canvas1, canvas2, canvas_segmentation, files, text_field, st
     # update tesseract text
     text_field.Update(value=file['text'])
 
+    # update bounding box coordinates
+    bbox_field.Update(value=str(file['bbox']))
+
     # Add image to the segmentation canvas
     if 'segmentation_figure' in state.keys():
         visuals.draw_segmentation(ax=state['segmentation_ax'],
@@ -116,6 +119,8 @@ def softmax_gui(files, image_path, figsize, lowres=False):
         [sg.Text("Tesseract Softmax Outputs")],
         [sg.Canvas(key="-SOFTMAX-")],
         [sg.Button("Next Line"), sg.Button("Next Mistake"), sg.Button("Toggle Resolution"), sg.Button("Exit")],
+        [sg.Text("Bounding Box:")],
+        [sg.Text(200 * " ", key="-BBOX-")],
     ]
     segmentation_column = [
         [
@@ -165,6 +170,7 @@ def softmax_gui(files, image_path, figsize, lowres=False):
                     canvas_segmentation=window["-SEGMENTATION-"].TKCanvas,
                     files=files,
                     text_field=window["-TESSTEXT-"],
+                    bbox_field=window["-BBOX-"],
                     state=current_state,
                     image_path=image_path,
                     figsize=figsize,
@@ -199,6 +205,7 @@ def softmax_gui(files, image_path, figsize, lowres=False):
                             canvas_segmentation=window["-SEGMENTATION-"].TKCanvas,
                             files=files,
                             text_field=window["-TESSTEXT-"],
+                            bbox_field=window["-BBOX-"],
                             state=current_state,
                             image_path=image_path,
                             figsize=figsize,
@@ -223,6 +230,7 @@ def softmax_gui(files, image_path, figsize, lowres=False):
                             canvas_segmentation=window["-SEGMENTATION-"].TKCanvas,
                             files=files,
                             text_field=window["-TESSTEXT-"],
+                            bbox_field=window["-BBOX-"],
                             state=current_state,
                             image_path=image_path,
                             figsize=figsize,

@@ -1,8 +1,7 @@
 import os
-import pandas as pd
-import numpy as np
 
-from .page_data import Document
+
+from softmax_tools.page_data import Document
 
 
 def read_header(path):
