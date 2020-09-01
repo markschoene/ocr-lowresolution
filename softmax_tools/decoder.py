@@ -1,10 +1,10 @@
 # Python Library
 import numpy as np
-import tensorflow as tf
 from tensorflow.keras.backend import ctc_decode
 
 # Softmax Library
-from ctc_decoder import BeamSearch, BestPath
+from ctc_decoder import BeamSearch
+
 
 class Decoder(object):
     """
@@ -46,10 +46,16 @@ class Decoder(object):
 
         return decoded
 
+    def decode_line(self, df):
+        pass
+
 
 class CTCDecoderKeras(Decoder):
+    def __init__(self, beam_width):
+        super().__init__()
+        self.beam_width = beam_width
 
-    def decode_line(self, df, beam_width):
+    def decode_line(self, df):
         if len(df) == 0:
             return ""
 
@@ -57,18 +63,9 @@ class CTCDecoderKeras(Decoder):
         length = np.array([pred.shape[1]])
         null_char = df.columns.get_loc('<null>')
 
-        sequences, _ = ctc_decode(y_pred=pred, input_length=length, greedy=False, beam_width=beam_width, top_paths=1)
+        sequences, _ = ctc_decode(y_pred=pred, input_length=length, greedy=False, beam_width=self.beam_width, top_paths=1)
         sequence = sequences[0].numpy()[0]
         return self._decode_sequence(self.reduce_sequence(sequence, null_char), df.columns)
-
-
-class CTCDecoderBestPath(Decoder):
-    """
-    a wrapper for the BestPath function from the CTCDecoder package
-    https://github.com/githubharald/CTCDecoder
-    """
-    def decode_line(self, df):
-        return BestPath.ctcBestPath(mat=df.values, classes=df.columns[:-1])
 
 
 class CTCDecoderBeamSearch(Decoder):
@@ -76,11 +73,15 @@ class CTCDecoderBeamSearch(Decoder):
     a wrapper for the BeamSearch function from the CTCDecoder package
     https://github.com/githubharald/CTCDecoder
     """
-    def decode_line(self, df, beam_width):
-        return BeamSearch.ctcBeamSearch(mat=df.values, classes=df.columns[:-1], lm=None, beamWidth=beam_width)
+    def __init__(self, beam_width):
+        super().__init__()
+        self.beam_width = beam_width
+
+    def decode_line(self, df):
+        return BeamSearch.ctcBeamSearch(mat=df.values, classes=df.columns[:-1], lm=None, beamWidth=self.beam_width)
 
 
-class CTCDecoder(Decoder):
+class CTCBestPathDecoder(Decoder):
     """
     Best Path implementation
     """

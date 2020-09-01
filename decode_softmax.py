@@ -1,12 +1,13 @@
 # Python Library
 import argparse
 import os
+import tensorflow as tf
 
 # Softmax Library
 from softmax_tools import gui
 from softmax_tools import io
 from softmax_tools import metrics
-from softmax_tools.decoder import CTCDecoder
+from softmax_tools.decoder import CTCBestPathDecoder
 
 
 def main(tess_base, image_base, scalings, beam_width, visualize=False):
@@ -22,7 +23,7 @@ def main(tess_base, image_base, scalings, beam_width, visualize=False):
                                          header=header)
 
     # decode lines
-    decoder = CTCDecoder()
+    decoder = CTCBestPathDecoder()
     for _, doc in softmax_files.items():
         doc.ocr_document(decoder)
 
