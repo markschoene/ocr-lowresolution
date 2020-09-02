@@ -2,12 +2,13 @@
 import argparse
 import os
 import tensorflow as tf
+import time
 
 # Softmax Library
 from softmax_tools import gui
 from softmax_tools import io
 from softmax_tools import metrics
-from softmax_tools.decoder import CTCBestPathDecoder
+from softmax_tools.decoder import LanguageDecoder
 
 
 def main(tess_base, image_base, scalings, beam_width, visualize=False):
@@ -23,14 +24,26 @@ def main(tess_base, image_base, scalings, beam_width, visualize=False):
                                          header=header)
 
     # decode lines
-    decoder = CTCBestPathDecoder()
-    for _, doc in softmax_files.items():
-        doc.ocr_document(decoder)
+    decoder_time = 0
+    with tf.Session(graph=tf.Graph()) as sess:
+        model_dir = "/home/mark/Workspace/CMP_OCR_NLP/gpt-2/models"
+        decoder = LanguageDecoder(model_name="124M",
+                                  model_dir=model_dir,
+                                  beam_width=beam_width,
+                                  session=sess)
 
-        if visualize:
-            for font, d in doc.fonts.items():
-                for page in d['pages']:
-                    gui.softmax_gui(page['files'], page['img'], figsize=(10, 1), lowres=True)
+        for _, doc in softmax_files.items():
+            start = time.time()
+            doc.ocr_document(decoder)
+            end = time.time()
+            decoder_time += end - start
+
+            if visualize:
+                for font, d in doc.fonts.items():
+                    for page in d['pages']:
+                        gui.softmax_gui(page['files'], page['img'], figsize=(10, 1), lowres=True)
+
+    print(f"Decoding took {decoder_time} seconds")
 
     metrics.eval_docs(softmax_files, scalings, decoder.__class__.__name__)
 
