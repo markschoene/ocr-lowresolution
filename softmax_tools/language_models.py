@@ -49,29 +49,30 @@ class GPTModel(LanguageModel):
         self.ckpt = tf.train.latest_checkpoint(os.path.join(self.model_dir, self.model_name))
         self.saver.restore(self.session, self.ckpt)
 
-    def inference(self, context):
-        # TODO: use 'past' parameter to speed up inference
-        lm_output = gpt.model.model(hparams=self.hparams, X=context, past=None, reuse=tf.AUTO_REUSE)
+    def inference(self, tokens, past=None):
+        lm_output = gpt.model.model(hparams=self.hparams, X=tokens, past=past, reuse=tf.AUTO_REUSE)
 
-        tokens = lm_output['present']
+        present = lm_output['present'] if past is None else tf.concat([past, lm_output['present']], axis=-2)
         logits = lm_output['logits'][:, :, :self.hparams.n_vocab]
 
-        return tokens, logits
+        return logits, present
 
-    def score(self, tokens, context):
-
+    def step(self, context_tokens, past=None):
         c = tf.placeholder(tf.int32, [1, None])
-        output = self.inference(c)
-
+        output = self.inference(tokens=c, past=past)
         if not hasattr(self, 'saver'):
             self.init_saver()
 
-        context_tokens = [context + tokens] if context else [self.encoder.encoder['<|endoftext|>'] + tokens]
-        out = self.session.run(output, feed_dict={
+        logits, present = self.session.run(output, feed_dict={
             c: context_tokens
+
         })
-        logits = out[1][0, len(context):]
-        print(f"Tokens: {len(tokens)}, Context: {len(context)}, Logits: {logits.shape}")
+
+        return logits[0], present
+
+    def score(self, tokens, past):
+        context_tokens = [tokens]
+        logits, present = self.step(context_tokens, past)
 
         token_scores = [(logits[i] - np.log(np.exp(logits[i], dtype=np.float64).sum()))[tokens[i]]
                         for i in range(len(tokens))]

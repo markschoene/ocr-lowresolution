@@ -1,6 +1,7 @@
 # Python Library
 import re
 import numpy as np
+import tensorflow as tf
 from tensorflow.keras.backend import ctc_decode
 
 # Softmax Library
@@ -139,16 +140,20 @@ class LanguageDecoder(Decoder):
                             self._decode_sequence(np.array(beam), df.columns),
                             flags=re.UNICODE)
                      for beam in beams]
-            beams = list(dict.fromkeys(beams))  # remove duplicates
             beams_encoded = [self.enc.encode(beam) for beam in beams]
-            context = self.enc.encode(self.history)
 
+            # get past transformer attention to reduce compute
+            context = self.enc.encode(self.history)
+            past = self.get_past(context)
+
+            # compute NLP scores for beams
             scores = np.zeros(self.beam_width)
             for j, tokens in enumerate(beams_encoded):
-                s = self.model.score(tokens=tokens, context=context)
+                s = self.model.score(tokens=tokens, past=past)
                 scores[j] = s
                 print(self.enc.decode(context[-20:]), f"<{self.enc.decode(tokens)} | {np.exp(s)} | {tokens}>")
 
+            # merge NLP scores with OCR scores
             merged_scores = (scores + np.log(probs) / len(df)) / 2
             best_beam = beams[np.argmax(merged_scores)]
             output += best_beam
@@ -156,6 +161,11 @@ class LanguageDecoder(Decoder):
 
         return output
 
+    def get_past(self, context):
+        context_tokens = [context] if context else [self.enc.encoder['<|endoftext|>']]
+        _, past = self.model.step(context_tokens)
+
+        return past
 
     def read_line(self, df, history):
         self.history = history
