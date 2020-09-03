@@ -1,6 +1,7 @@
 import os
 import json
 import gpt2 as gpt
+import gpt2.encoder
 import gpt2.model
 import numpy as np
 import tensorflow as tf
@@ -10,6 +11,7 @@ class LanguageModel(object):
 
     def predict(self, history):
         pass
+
 
 class DummyModel(LanguageModel):
     def __init__(self, size):
@@ -48,6 +50,7 @@ class GPTModel(LanguageModel):
         self.saver.restore(self.session, self.ckpt)
 
     def inference(self, context):
+        # TODO: use 'past' parameter to speed up inference
         lm_output = gpt.model.model(hparams=self.hparams, X=context, past=None, reuse=tf.AUTO_REUSE)
 
         tokens = lm_output['present']
@@ -55,21 +58,23 @@ class GPTModel(LanguageModel):
 
         return tokens, logits
 
-    def predict(self, context):
-        # TODO: use batches for faster computing
-        # assert isinstance(history, list), "please pass history as a list"
-        batch_size = 1
+    def score(self, tokens, context):
 
-        c = tf.placeholder(tf.int32, [batch_size, None])
-
+        c = tf.placeholder(tf.int32, [1, None])
         output = self.inference(c)
 
         if not hasattr(self, 'saver'):
             self.init_saver()
-        context_tokens = [context] if context else [[self.encoder.encoder['<|endoftext|>']]]
+
+        context_tokens = [context + tokens] if context else [self.encoder.encoder['<|endoftext|>'] + tokens]
         out = self.session.run(output, feed_dict={
             c: context_tokens
         })
-        logits = out[1][0, -1]  # [0, -1] since batch size is 1, so access only 0 element. And the predictive logit is -1
+        logits = out[1][0, len(context):]
+        print(f"Tokens: {len(tokens)}, Context: {len(context)}, Logits: {logits.shape}")
 
-        return logits
+        token_scores = [(logits[i] - np.log(np.exp(logits[i], dtype=np.float64).sum()))[tokens[i]]
+                        for i in range(len(tokens))]
+        score = np.sum(token_scores) / len(tokens)
+
+        return score
