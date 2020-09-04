@@ -6,7 +6,7 @@ import time
 
 # Softmax Library
 from softmax_tools import gui
-from softmax_tools import io
+from softmax_tools import read
 from softmax_tools import metrics
 from softmax_tools.decoder import LanguageDecoder
 
@@ -15,13 +15,13 @@ def main(tess_base, image_base, scalings, beam_width, visualize=False):
 
     # read header to label tesseract softmax outputs
     head_path = os.path.join(os.path.dirname(image_base), 'header.txt')
-    header = io.read_header(head_path)
+    header = read.read_header(head_path)
 
     # collect all desired softmax files
-    softmax_files = io.get_softmax_files(base_path=tess_base,
-                                         image_base=image_base,
-                                         scalings=scalings,
-                                         header=header)
+    softmax_files = read.get_softmax_files(base_path=tess_base,
+                                           image_base=image_base,
+                                           scalings=scalings,
+                                           header=header)
 
     # decode lines
     decoder_time = 0
