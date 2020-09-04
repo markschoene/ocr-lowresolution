@@ -118,6 +118,7 @@ class LanguageDecoder(Decoder):
         self.model = language_models.GPTModel(model_name=model_name, model_dir=model_dir, session=session)
         self.enc = self.model.encoder
         self.history = '<|endoftext|>'
+        self.past = None
 
         # load model parameters
         saver = tf.train.Saver()
@@ -158,6 +159,8 @@ class LanguageDecoder(Decoder):
 
         # loop the words and merge language model outputs with beam search outputs
         output = ""
+        beam_search_time = 0
+        nlp_time = 0
         for i in range(1, len(separator)):
 
             # do beam search
@@ -168,7 +171,7 @@ class LanguageDecoder(Decoder):
             beams, probs = ctcBeamSearch(mat=seq.values,
                                          blankIdx=len(df.columns) - 1,
                                          beamWidth=self.beam_width)
-            end_beam_search = time.time()
+            beam_search_time += time.time() - start_beam_search
 
             # prepare beams for NLP
             beams, probs = self.remove_blank_at_beam_end(beams=beams, probs=probs, blank_char=blank_char)
@@ -177,21 +180,21 @@ class LanguageDecoder(Decoder):
 
             # get past transformer attention to reduce compute
             context = self.enc.encode(self.history)
-            if not hasattr(self, 'past'):
+            if self.past is None:
                 self.past = self.get_past(context)
 
             # compute NLP scores for beams
+            start_nlp_time = time.time()
             scores = np.zeros(len(beams))
             past_list = []
             for j, tokens in enumerate(beams_encoded):
                 score, past = self.model.score(tokens=tokens, past=self.past)
                 scores[j] = score
                 past_list.append(past)
-                print(self.history[-20:], f"<{self.enc.decode(tokens)} | {np.exp(score)} | {tokens}>")
 
             # merge NLP scores with OCR scores
-            end_nlp = time.time()
-            print(f"Time for a) beam search: {end_beam_search - start_beam_search} b) nlp: {end_nlp - end_beam_search}")
+            nlp_time += time.time() - start_nlp_time
+
             merged_scores = (scores + np.log(probs)) / 2
             best_beam = np.argmax(merged_scores)
             output += beams[best_beam]
@@ -199,6 +202,7 @@ class LanguageDecoder(Decoder):
             self.past = past_list[best_beam]
             del past_list
 
+        print(f"Time for a) beam search: {beam_search_time} b) nlp: {nlp_time}")
         return output
 
     def clear_past(self):
