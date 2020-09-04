@@ -2,6 +2,7 @@
 import os
 import numpy as np
 import pandas as pd
+import time
 
 # Softmax Library
 from softmax_tools import boxes
@@ -64,16 +65,20 @@ class Document(object):
         :return:
         """
         print(f"Decoding outputs for {self.name}")
-
+        history = ""
         for font, d in self.fonts.items():
             d['page_texts'] = []
             for page in d['pages']:
 
                 # decode individual lines
                 for file in page['files']:
+                    decoder.history = history
+                    start = time.time()
                     text = decoder.decode_line(file['data'])
                     file['text'] = text
-
+                    history = text
+                    end = time.time()
+                    print(f"Decoding line took {end-start} seconds")
                 # merge lines to full page text
                 t = self.page_text(page['files'])
                 d['page_texts'].append(t)
