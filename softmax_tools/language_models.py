@@ -41,31 +41,23 @@ class GPTModel(LanguageModel):
         # Byte Pair Encoder
         self.encoder = gpt.encoder.get_encoder(model_name, model_dir)
 
-        # parameters for inference
-        self.num_classes = len(self.encoder.bpe_ranks.keys())
+        # build graph
+        self.c = tf.placeholder(tf.int32, [1, None])
+        self.past = None
+        self.output = self.inference(tokens=self.c)
 
-    def init_saver(self):
-        self.saver = tf.train.Saver()
-        self.ckpt = tf.train.latest_checkpoint(os.path.join(self.model_dir, self.model_name))
-        self.saver.restore(self.session, self.ckpt)
+    def inference(self, tokens):
+        lm_output = gpt.model.model(hparams=self.hparams, X=tokens, past=self.past, reuse=tf.AUTO_REUSE)
 
-    def inference(self, tokens, past=None):
-        lm_output = gpt.model.model(hparams=self.hparams, X=tokens, past=past, reuse=tf.AUTO_REUSE)
-
-        present = lm_output['present'] if past is None else tf.concat([past, lm_output['present']], axis=-2)
+        present = lm_output['present'] if self.past is None else tf.concat([self.past, lm_output['present']], axis=-2)
         logits = lm_output['logits'][:, :, :self.hparams.n_vocab]
 
         return logits, present
 
     def step(self, context_tokens, past=None):
-        c = tf.placeholder(tf.int32, [1, None])
-        output = self.inference(tokens=c, past=past)
-        if not hasattr(self, 'saver'):
-            self.init_saver()
-
-        logits, present = self.session.run(output, feed_dict={
-            c: context_tokens
-
+        self.past = past
+        logits, present = self.session.run(self.output, feed_dict={
+            self.c: context_tokens
         })
 
         return logits[0], present
@@ -78,4 +70,4 @@ class GPTModel(LanguageModel):
                         for i in range(len(tokens))]
         score = np.sum(token_scores) / len(tokens)
 
-        return score
+        return score, present

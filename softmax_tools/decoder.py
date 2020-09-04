@@ -1,5 +1,7 @@
 # Python Library
-import re
+from copy import deepcopy
+import time
+import os
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.backend import ctc_decode
@@ -115,6 +117,30 @@ class LanguageDecoder(Decoder):
         self.beam_width = beam_width
         self.model = language_models.GPTModel(model_name=model_name, model_dir=model_dir, session=session)
         self.enc = self.model.encoder
+        self.history = '<|endoftext|>'
+
+        # load model parameters
+        saver = tf.train.Saver()
+        ckpt = tf.train.latest_checkpoint(os.path.join(self.model.model_dir,
+                                                       self.model.model_name))
+        saver.restore(session, ckpt)
+
+    @staticmethod
+    def remove_blank_at_beam_end(beams, probs, blank_char):
+        new_beams, new_probs = [], []
+        for j in range(len(beams)):
+            b = deepcopy(beams[j])
+            while b[-1] == blank_char and len(b) > 1:
+                b = b[:-1]
+            if b == beams[j]:
+                new_beams.append(b)
+                new_probs.append(probs[j])
+            else:
+                if b not in beams:
+                    new_beams.append(b)
+                    new_probs.append(probs[j])
+
+        return new_beams, new_probs
 
     def decode_line(self, df):
         """
@@ -124,7 +150,8 @@ class LanguageDecoder(Decoder):
         """
 
         # get blanks and remove duplicates
-        blanks = np.arange(len(df))[0 == np.argmax(df.values, axis=1)].tolist()
+        blank_char = df.columns.get_loc(" ")
+        blanks = np.arange(len(df))[blank_char == np.argmax(df.values, axis=1)].tolist()
         separator = [0, blanks[0]]
         separator.extend([blanks[i] for i in range(1, len(blanks)) if blanks[i] != blanks[i - 1] + 1])
         separator.append(len(df) - 1)
@@ -132,34 +159,51 @@ class LanguageDecoder(Decoder):
         # loop the words and merge language model outputs with beam search outputs
         output = ""
         for i in range(1, len(separator)):
+
+            # do beam search
             seq = df.iloc[separator[i - 1] + 1:separator[i]]
+
+            start_beam_search = time.time()
+            # TODO: Include removal of blanks in beam search
             beams, probs = ctcBeamSearch(mat=seq.values,
                                          blankIdx=len(df.columns) - 1,
                                          beamWidth=self.beam_width)
-            beams = [re.sub(r"\s+$", "",
-                            self._decode_sequence(np.array(beam), df.columns),
-                            flags=re.UNICODE)
-                     for beam in beams]
+            end_beam_search = time.time()
+
+            # prepare beams for NLP
+            beams, probs = self.remove_blank_at_beam_end(beams=beams, probs=probs, blank_char=blank_char)
+            beams = [self._decode_sequence(list(beam), df.columns) for beam in beams]
             beams_encoded = [self.enc.encode(beam) for beam in beams]
 
             # get past transformer attention to reduce compute
             context = self.enc.encode(self.history)
-            past = self.get_past(context)
+            if not hasattr(self, 'past'):
+                self.past = self.get_past(context)
 
             # compute NLP scores for beams
-            scores = np.zeros(self.beam_width)
+            scores = np.zeros(len(beams))
+            past_list = []
             for j, tokens in enumerate(beams_encoded):
-                s = self.model.score(tokens=tokens, past=past)
-                scores[j] = s
-                print(self.enc.decode(context[-20:]), f"<{self.enc.decode(tokens)} | {np.exp(s)} | {tokens}>")
+                score, past = self.model.score(tokens=tokens, past=self.past)
+                scores[j] = score
+                past_list.append(past)
+                print(self.history[-20:], f"<{self.enc.decode(tokens)} | {np.exp(score)} | {tokens}>")
 
             # merge NLP scores with OCR scores
-            merged_scores = (scores + np.log(probs) / len(df)) / 2
-            best_beam = beams[np.argmax(merged_scores)]
-            output += best_beam
-            context.extend(self.enc.encode(best_beam))
+            end_nlp = time.time()
+            print(f"Time for a) beam search: {end_beam_search - start_beam_search} b) nlp: {end_nlp - end_beam_search}")
+            merged_scores = (scores + np.log(probs)) / 2
+            best_beam = np.argmax(merged_scores)
+            output += beams[best_beam]
+            self.history += beams[best_beam]
+            self.past = past_list[best_beam]
+            del past_list
 
         return output
+
+    def clear_past(self):
+        if self.past:
+            self.past = None
 
     def get_past(self, context):
         context_tokens = [context] if context else [self.enc.encoder['<|endoftext|>']]
