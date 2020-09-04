@@ -68,6 +68,6 @@ class GPTModel(LanguageModel):
 
         token_scores = [(logits[i] - np.log(np.exp(logits[i], dtype=np.float64).sum()))[tokens[i]]
                         for i in range(len(tokens))]
-        score = np.sum(token_scores) / len(tokens)
+        score = np.sum(token_scores)
 
         return score, present
