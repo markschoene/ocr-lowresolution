@@ -31,10 +31,12 @@ def main(tess_base, image_base, scalings, beam_width, visualize=False):
                                   model_dir=model_dir,
                                   beam_width=beam_width,
                                   session=sess)
+        tf.get_default_graph().finalize()
 
         for _, doc in softmax_files.items():
             start = time.time()
             doc.ocr_document(decoder)
+            decoder.clear_past()
             end = time.time()
             decoder_time += end - start
 

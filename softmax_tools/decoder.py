@@ -131,7 +131,7 @@ class LanguageDecoder(Decoder):
         new_beams, new_probs = [], []
         for j in range(len(beams)):
             b = deepcopy(beams[j])
-            while b[-1] == blank_char and len(b) > 1:
+            while len(b) > 1 and b[-1] == blank_char:
                 b = b[:-1]
             if b == beams[j]:
                 new_beams.append(b)
@@ -153,9 +153,12 @@ class LanguageDecoder(Decoder):
         # get blanks and remove duplicates
         blank_char = df.columns.get_loc(" ")
         blanks = np.arange(len(df))[blank_char == np.argmax(df.values, axis=1)].tolist()
-        separator = [0, blanks[0]]
-        separator.extend([blanks[i] for i in range(1, len(blanks)) if blanks[i] != blanks[i - 1] + 1])
-        separator.append(len(df) - 1)
+        if blanks:
+            separator = [0, blanks[0]]
+            separator.extend([blanks[i] for i in range(1, len(blanks)) if blanks[i] != blanks[i - 1] + 1])
+            separator.append(len(df) - 1)
+        else:
+            separator = [0, len(df) - 1]
 
         # loop the words and merge language model outputs with beam search outputs
         output = ""
@@ -208,6 +211,7 @@ class LanguageDecoder(Decoder):
     def clear_past(self):
         if self.past:
             self.past = None
+        self.history = '<|endoftext|>'
 
     def get_past(self, context):
         context_tokens = [context] if context else [self.enc.encoder['<|endoftext|>']]
