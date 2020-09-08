@@ -45,7 +45,9 @@ def main(tess_base, image_base, decoder, scalings, visualize=False):
 
 
 def language_model_decoding(decoder_class, tess_base, image_base, model_dir, beam_width, scalings, visualize):
-    with tf.Session(graph=tf.Graph()) as sess:
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    with tf.Session(graph=tf.Graph(), config=config) as sess:
         decoder = decoder_class(model_dir=model_dir,
                                 beam_width=beam_width,
                                 session=sess)
