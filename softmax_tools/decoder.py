@@ -4,12 +4,11 @@ import time
 import os
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.backend import ctc_decode
 
 # Softmax Library
-from ctc_decoder import BeamSearch
 from softmax_tools import language_models
 from softmax_tools.beam_search import ctcBeamSearch
+
 
 class Decoder(object):
     """
@@ -54,26 +53,11 @@ class Decoder(object):
     def decode_line(self, df):
         pass
 
-
-class CTCDecoderKeras(Decoder):
-    def __init__(self, beam_width):
-        super().__init__()
-        self.beam_width = beam_width
-
-    def decode_line(self, df):
-        if len(df) == 0:
-            return ""
-
-        pred = np.expand_dims(df.values, axis=0)
-        length = np.array([pred.shape[1]])
-        null_char = df.columns.get_loc('<null>')
-
-        sequences, _ = ctc_decode(y_pred=pred, input_length=length, greedy=False, beam_width=self.beam_width, top_paths=1)
-        sequence = sequences[0].numpy()[0]
-        return self._decode_sequence(self.reduce_sequence(sequence, null_char), df.columns)
+    def clear_past(self):
+        pass
 
 
-class CTCDecoderBeamSearch(Decoder):
+class BeamSearchDecoder(Decoder):
     """
     a wrapper for the BeamSearch function from the CTCDecoder package
     https://github.com/githubharald/CTCDecoder
@@ -83,10 +67,10 @@ class CTCDecoderBeamSearch(Decoder):
         self.beam_width = beam_width
 
     def decode_line(self, df):
-        return BeamSearch.ctcBeamSearch(mat=df.values, classes=df.columns[:-1], lm=None, beamWidth=self.beam_width)
+        return ctcBeamSearch(mat=df.values, blankIdx=len(df.columns), beamWidth=self.beam_width)
 
 
-class CTCBestPathDecoder(Decoder):
+class BestPathDecoder(Decoder):
     """
     Best Path implementation
     """
@@ -209,8 +193,7 @@ class LanguageDecoder(Decoder):
         return output
 
     def clear_past(self):
-        if self.past:
-            self.past = None
+        self.past = None
         self.history = '<|endoftext|>'
 
     def get_past(self, context):
@@ -222,3 +205,23 @@ class LanguageDecoder(Decoder):
     def read_line(self, df, history):
         self.history = history
         return self.decode_line(df)
+
+
+class LanguageDecoder124M(LanguageDecoder):
+    def __init__(self, model_dir, beam_width, session):
+        super().__init__("124M", model_dir, beam_width, session)
+
+
+class LanguageDecoder355M(LanguageDecoder):
+    def __init__(self, model_dir, beam_width, session):
+        super().__init__("355M", model_dir, beam_width, session)
+
+
+class LanguageDecoder774M(LanguageDecoder):
+    def __init__(self, model_dir, beam_width, session):
+        super().__init__("774M", model_dir, beam_width, session)
+
+
+class LanguageDecoder1558M(LanguageDecoder):
+    def __init__(self, model_dir, beam_width, session):
+        super().__init__("1558M", model_dir, beam_width, session)
