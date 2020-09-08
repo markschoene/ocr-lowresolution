@@ -43,5 +43,5 @@ def eval_docs(doc_list, scalings, decoder_name):
                                          out[font]['CLA quotes'].dot(out[font]['Chars']) / out[font]['Chars'].sum(),
                                          out[font]['WLA quotes'].dot(out[font]['Words']) / out[font]['Words'].sum(),
                                          ]
-        outfile = os.path.join(tessbase, f'{font}-{scalings}-metrics-{decoder_name}.csv')
+        outfile = os.path.join(tessbase, 'metrics', f'{font}-{scalings}-metrics-{decoder_name}.csv')
         out[font].to_csv(outfile, index=False)
