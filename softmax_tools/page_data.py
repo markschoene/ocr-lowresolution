@@ -132,9 +132,9 @@ class Document(object):
                 return False
 
         for line, arr in enumerate(page_shaddow):
-            text += append_text(arr)
             if line > 0 and blank_line(line):
                 text += "\n"
+            text += append_text(arr)
             text += "\n"
 
         return text
