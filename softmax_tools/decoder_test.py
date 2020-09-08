@@ -7,7 +7,7 @@ import pandas as pd
 
 # Softmax Library
 import softmax_tools.decoder as decoder
-from softmax_tools.io import read_header
+from softmax_tools.read import read_header
 
 
 def random_line(length, header):

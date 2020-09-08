@@ -61,7 +61,7 @@ class BeamSearchDecoder(Decoder):
     """
     A wrapper for tensorflows tf.nn.ctc_beam_search_decoder_v2 function
     """
-    def __init__(self, beam_width, session):
+    def __init__(self, beam_width, session, top_paths=1):
         super().__init__()
         self.beam_width = beam_width
         self.session = session
@@ -71,12 +71,9 @@ class BeamSearchDecoder(Decoder):
         self.output = tf_beam_search(inputs=self.inputs,
                                      sequence_length=self.sequence_length,
                                      beam_width=self.beam_width,
-                                     top_paths=1)
+                                     top_paths=top_paths)
 
-    def decode_line(self, df):
-        if len(df) == 0:
-            return ""
-
+    def beam_search(self, df):
         ocr_logits = np.log(np.expand_dims(df.values, axis=1))
         length = np.array([len(df)])
 
@@ -86,9 +83,19 @@ class BeamSearchDecoder(Decoder):
             self.sequence_length: length
         })
 
+        decoded = [self._decode_sequence(d.values, df.columns) for d in decoded]
+        logits = logits.squeeze()
+        return decoded, logits
+
+    def decode_line(self, df):
+        if len(df) == 0:
+            return ""
+
+        # run beam search
+        decoded, _ = self.beam_search(df)
+
         # extract top path from tf outputs
-        sequence = decoded[0].values.squeeze()
-        return self._decode_sequence(sequence, df.columns)
+        return decoded[0]
 
 
 class BestPathDecoder(Decoder):
@@ -120,6 +127,7 @@ class LanguageDecoder(Decoder):
     def __init__(self, model_name, model_dir, beam_width, session):
         super().__init__()
         self.beam_width = beam_width
+        self.ctc_decoder = BeamSearchDecoder(self.beam_width, session, top_paths=beam_width)
         self.model = language_models.GPTModel(model_name=model_name, model_dir=model_dir, session=session)
         self.enc = self.model.encoder
         self.history = '<|endoftext|>'
@@ -132,21 +140,21 @@ class LanguageDecoder(Decoder):
         saver.restore(session, ckpt)
 
     @staticmethod
-    def remove_blank_at_beam_end(beams, probs, blank_char):
-        new_beams, new_probs = [], []
+    def remove_blank_at_beam_end(beams, logits):
+        new_beams, new_logits = [], []
         for j in range(len(beams)):
             b = deepcopy(beams[j])
-            while len(b) > 1 and b[-1] == blank_char:
+            while len(b) > 1 and b[-1] == ' ':
                 b = b[:-1]
             if b == beams[j]:
                 new_beams.append(b)
-                new_probs.append(probs[j])
+                new_logits.append(logits[j])
             else:
                 if b not in beams:
                     new_beams.append(b)
-                    new_probs.append(probs[j])
+                    new_logits.append(logits[j])
 
-        return new_beams, new_probs
+        return new_beams, new_logits
 
     def decode_line(self, df):
         """
@@ -167,23 +175,15 @@ class LanguageDecoder(Decoder):
 
         # loop the words and merge language model outputs with beam search outputs
         output = ""
-        beam_search_time = 0
-        nlp_time = 0
         for i in range(1, len(separator)):
 
             # do beam search
             seq = df.iloc[separator[i - 1] + 1:separator[i]]
 
-            start_beam_search = time.time()
-            # TODO: Include removal of blanks in beam search
-            beams, probs = ctcBeamSearch(mat=seq.values,
-                                         blankIdx=len(df.columns) - 1,
-                                         beamWidth=self.beam_width)
-            beam_search_time += time.time() - start_beam_search
+            beams, ocr_logits = self.ctc_decoder.beam_search(seq)
 
             # prepare beams for NLP
-            beams, probs = self.remove_blank_at_beam_end(beams=beams, probs=probs, blank_char=blank_char)
-            beams = [self._decode_sequence(list(beam), df.columns) for beam in beams]
+            beams, ocr_logits = self.remove_blank_at_beam_end(beams=beams, logits=ocr_logits)
             beams_encoded = [self.enc.encode(beam) for beam in beams]
 
             # get past transformer attention to reduce compute
@@ -192,7 +192,6 @@ class LanguageDecoder(Decoder):
                 self.past = self.get_past(context)
 
             # compute NLP scores for beams
-            start_nlp_time = time.time()
             scores = np.zeros(len(beams))
             past_list = []
             for j, tokens in enumerate(beams_encoded):
@@ -201,16 +200,14 @@ class LanguageDecoder(Decoder):
                 past_list.append(past)
 
             # merge NLP scores with OCR scores
-            nlp_time += time.time() - start_nlp_time
 
-            merged_scores = (scores + np.log(probs)) / 2
+            merged_scores = (scores + ocr_logits) / 2
             best_beam = np.argmax(merged_scores)
             output += beams[best_beam]
             self.history += beams[best_beam]
             self.past = past_list[best_beam]
             del past_list
 
-        print(f"Time for a) beam search: {beam_search_time} b) nlp: {nlp_time}")
         return output
 
     def clear_past(self):
