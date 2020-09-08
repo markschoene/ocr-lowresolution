@@ -9,8 +9,9 @@ from softmax_tools import boxes
 
 
 class Document(object):
-    def __init__(self, name, tess_base, image_base):
+    def __init__(self, name, tess_base, image_base, scalings):
         self.name = name
+        self.scalings = scalings
         self.tess_base = tess_base
         self.image_base = image_base
         self.root = os.path.join(tess_base, name, 'Softmax')
@@ -27,7 +28,7 @@ class Document(object):
         if font not in self.fonts.keys():
             self.fonts[font] = {'pages': [], 'page_numbers': []}
 
-        img_name = self.name + '-' + font + '-page' + str(page_index) + '.png'
+        img_name = file_name.split('-' + self.scalings)[0] + '.png'
         img_path = os.path.join(self.image_base, self.name, img_name)
         self.add_page(font, page_index, img_path)
 
@@ -57,11 +58,16 @@ class Document(object):
         assert self.fonts[font]['page_numbers'] == list(range(min(self.fonts[font]['page_numbers']),
                                                               max(self.fonts[font]['page_numbers']) + 1))
 
+    def save_page_text(self, text, img_path, suffix):
+        file_name = f"{os.path.basename(img_path)[:-4]}-{self.scalings}-{suffix}.txt"
+        save_path = os.path.join(self.tess_base, self.name, file_name)
+        with open(save_path, "w") as f:
+            f.write(text)
+
     def ocr_document(self, decoder):
         """
         Uses a CTC decoder to generate human readable text from softmax files stored in this document
         :param decoder: a CTC decoder class with method 'decode_line'
-        :param beam_width: width for beam search
         :return:
         """
         print(f"Decoding outputs for {self.name}")
@@ -78,6 +84,7 @@ class Document(object):
                     print(f"Decoding line took {end-start} seconds")
                 # merge lines to full page text
                 t = self.page_text(page['files'])
+                self.save_page_text(text=t, img_path=page['img'], suffix=decoder.__class__.__name__)
                 d['page_texts'].append(t)
 
     @staticmethod
