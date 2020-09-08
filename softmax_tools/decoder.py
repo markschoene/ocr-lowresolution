@@ -208,6 +208,7 @@ class LanguageDecoder(Decoder):
             self.past = past_list[best_beam]
             del past_list
 
+        self.history += "\n"
         return output
 
     def clear_past(self):

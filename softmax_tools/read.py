@@ -41,6 +41,8 @@ def get_softmax_files(base_path, image_base, scalings, header):
         for file in sorted(os.listdir(doc.root)):
             if '.bin' in file and scalings in file:
                 doc.add_file(file, header)
+
+        doc.sort_pages()
         outfiles[d] = doc
 
     return outfiles

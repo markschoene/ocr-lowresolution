@@ -2,7 +2,6 @@
 import os
 import numpy as np
 import pandas as pd
-import time
 
 # Softmax Library
 from softmax_tools import boxes
@@ -58,6 +57,23 @@ class Document(object):
         assert self.fonts[font]['page_numbers'] == list(range(min(self.fonts[font]['page_numbers']),
                                                               max(self.fonts[font]['page_numbers']) + 1))
 
+    def sort_pages(self):
+        for font, d in self.fonts.items():
+            for page in d['pages']:
+                self.sort_page(page)
+
+    def sort_page(self, page):
+        bboxes = [file['bbox'] for file in page['files']]
+        links = boxes.align_boxes(bboxes, iou_thresh=0.6)
+        page_shaddow = boxes.page_shaddow(bboxes, links)
+
+        out_files = []
+        for row in page_shaddow:
+            for item in row:
+                out_files.append(page['files'][item])
+
+        page['files'] = out_files
+
     def save_page_text(self, text, img_path, suffix):
         file_name = f"{os.path.basename(img_path)[:-4]}-{self.scalings}-{suffix}.txt"
         save_path = os.path.join(self.tess_base, self.name, file_name)
@@ -70,18 +86,16 @@ class Document(object):
         :param decoder: a CTC decoder class with method 'decode_line'
         :return:
         """
-        print(f"Decoding outputs for {self.name}")
         for font, d in self.fonts.items():
             d['page_texts'] = []
-            for page in d['pages']:
+            for i, page in zip(d['page_numbers'], d['pages']):
+                print(f"Decoding outputs: {self.name} - {font} - Page {i} / {len(d['pages'])}")
 
                 # decode individual lines
                 for file in page['files']:
-                    start = time.time()
                     text = decoder.decode_line(file['data'])
                     file['text'] = text
-                    end = time.time()
-                    print(f"Decoding line took {end-start} seconds")
+
                 # merge lines to full page text
                 t = self.page_text(page['files'])
                 self.save_page_text(text=t, img_path=page['img'], suffix=decoder.__class__.__name__)
