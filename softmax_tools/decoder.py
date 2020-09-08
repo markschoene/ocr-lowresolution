@@ -4,7 +4,7 @@ import time
 import os
 import numpy as np
 import tensorflow as tf
-
+from tensorflow.nn import ctc_beam_search_decoder_v2 as tf_beam_search
 # Softmax Library
 from softmax_tools import language_models
 from softmax_tools.beam_search import ctcBeamSearch
@@ -59,15 +59,36 @@ class Decoder(object):
 
 class BeamSearchDecoder(Decoder):
     """
-    a wrapper for the BeamSearch function from the CTCDecoder package
-    https://github.com/githubharald/CTCDecoder
+    A wrapper for tensorflows tf.nn.ctc_beam_search_decoder_v2 function
     """
-    def __init__(self, beam_width):
+    def __init__(self, beam_width, session):
         super().__init__()
         self.beam_width = beam_width
+        self.session = session
+
+        self.inputs = tf.placeholder(tf.float32, [None, 1, None])
+        self.sequence_length = tf.placeholder(tf.int32, [1])
+        self.output = tf_beam_search(inputs=self.inputs,
+                                     sequence_length=self.sequence_length,
+                                     beam_width=self.beam_width,
+                                     top_paths=1)
 
     def decode_line(self, df):
-        return ctcBeamSearch(mat=df.values, blankIdx=len(df.columns), beamWidth=self.beam_width)
+        if len(df) == 0:
+            return ""
+
+        ocr_logits = np.log(np.expand_dims(df.values, axis=1))
+        length = np.array([len(df)])
+
+        # run tensorflow session
+        decoded, logits = self.session.run(self.output, feed_dict={
+            self.inputs: ocr_logits,
+            self.sequence_length: length
+        })
+
+        # extract top path from tf outputs
+        sequence = decoded[0].values.squeeze()
+        return self._decode_sequence(sequence, df.columns)
 
 
 class BestPathDecoder(Decoder):

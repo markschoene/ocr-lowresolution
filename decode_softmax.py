@@ -26,9 +26,9 @@ def main(tess_base, image_base, decoder, scalings, visualize=False):
 
     # decode lines
     decoder_time = 0
-
     for _, doc in softmax_files.items():
         start = time.time()
+        # TODO: read lines in the proper order to apply LM!!!
         doc.ocr_document(decoder)
         decoder.clear_past()
         end = time.time()
@@ -44,7 +44,7 @@ def main(tess_base, image_base, decoder, scalings, visualize=False):
     metrics.eval_docs(softmax_files, scalings, decoder.__class__.__name__)
 
 
-def language_model_decoding(tess_base, image_base, model_dir, beam_width, scalings, visualize):
+def language_model_decoding(decoder_class, tess_base, image_base, model_dir, beam_width, scalings, visualize):
     with tf.Session(graph=tf.Graph()) as sess:
         decoder = decoder_class(model_dir=model_dir,
                                 beam_width=beam_width,
@@ -57,7 +57,7 @@ def language_model_decoding(tess_base, image_base, model_dir, beam_width, scalin
              visualize=visualize)
 
 
-def best_path_decoding(tess_base, image_base, scalings, visualize):
+def best_path_decoding(decoder_class, tess_base, image_base, scalings, visualize):
     decoder = decoder_class()
     main(tess_base=tess_base,
          image_base=image_base,
@@ -66,13 +66,15 @@ def best_path_decoding(tess_base, image_base, scalings, visualize):
          visualize=visualize)
 
 
-def beam_search_decoding(tess_base, image_base, beam_width, scalings, visualize):
-    decoder = decoder_class(beam_width=beam_width)
-    main(tess_base=tess_base,
-         image_base=image_base,
-         decoder=decoder,
-         scalings=scalings,
-         visualize=visualize)
+def beam_search_decoding(decoder_class, tess_base, image_base, beam_width, scalings, visualize):
+    with tf.Session() as sess:
+        decoder = decoder_class(beam_width=beam_width, session=sess)
+        tf.get_default_graph().finalize()
+        main(tess_base=tess_base,
+             image_base=image_base,
+             decoder=decoder,
+             scalings=scalings,
+             visualize=visualize)
 
 
 if __name__ == "__main__":
@@ -95,33 +97,28 @@ if __name__ == "__main__":
 
     args = arg_parser.parse_args()
 
-    decoder_class = getattr(softmax_tools.decoder, args.decoder, f"Decoder class '{args.decoder}' does not exist")
+    decoder_cls = getattr(softmax_tools.decoder, args.decoder, f"Decoder class '{args.decoder}' does not exist")
 
     if 'BestPath' in args.decoder:
-        best_path_decoding(tess_base=args.tess_base,
+        best_path_decoding(decoder_class=decoder_cls,
+                           tess_base=args.tess_base,
                            image_base=args.image_base,
                            scalings=args.scalings,
                            visualize=args.visualize)
     elif 'BeamSearch' in args.decoder:
         assert args.beam_width, "Please set the '-bw' argument to use a beam search decoder"
-
-        def run(arguments):
-            beam_search_decoding(tess_base=arguments.tess_base,
-                                 image_base=arguments.image_base,
-                                 beam_width=arguments.beam_width,
-                                 scalings=arguments.scalings,
-                                 visualize=arguments.visualize)
-
-        if 'Keras' in args.decoder:
-            with tf.Session():
-                run(args)
-        else:
-            run(args)
+        beam_search_decoding(decoder_class=decoder_cls,
+                             tess_base=args.tess_base,
+                             image_base=args.image_base,
+                             beam_width=args.beam_width,
+                             scalings=args.scalings,
+                             visualize=args.visualize)
 
     elif 'LanguageDecoder' in args.decoder:
         assert args.model_dir, "Please set the directory to the gpt-2 models, e.g. ../gpt-2/models"
         assert args.beam_width, "Please set the '-bw' argument to use a beam search based decoder"
-        language_model_decoding(tess_base=args.tess_base,
+        language_model_decoding(decoder_class=decoder_cls,
+                                tess_base=args.tess_base,
                                 image_base=args.image_base,
                                 beam_width=args.beam_width,
                                 model_dir=args.model_dir,
