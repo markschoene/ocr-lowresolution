@@ -92,7 +92,7 @@ if __name__ == "__main__":
                             help='opens a GUI to examine errors')
     arg_parser.add_argument('-bw', '--beam_width', type=int,
                             help='beam width for ctc decoder')
-    arg_parser.add_argument('-a', '--alpha', default=0.5,
+    arg_parser.add_argument('-a', '--alpha', default=0.5, type=float,
                             help="weight that is applied to the language model")
     arg_parser.add_argument('-d', '--decoder', default="CTCBestPathDecoder",
                             help='class name of a decoder in decoder.py')
