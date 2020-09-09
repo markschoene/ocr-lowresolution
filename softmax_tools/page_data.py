@@ -98,7 +98,7 @@ class Document(object):
 
                 # merge lines to full page text
                 t = self.page_text(page['files'])
-                self.save_page_text(text=t, img_path=page['img'], suffix=decoder.__class__.__name__)
+                self.save_page_text(text=t, img_path=page['img'], suffix=decoder.get_name_string())
                 d['page_texts'].append(t)
 
     @staticmethod

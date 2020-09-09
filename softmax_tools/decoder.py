@@ -18,6 +18,15 @@ class Decoder(object):
     def __init__(self):
         self.history = ''
 
+    def decode_line(self, df):
+        pass
+
+    def clear_past(self):
+        pass
+
+    def get_name_string(self):
+        pass
+
     @staticmethod
     def reduce_sequence(sequence, null_id):
         """
@@ -50,12 +59,6 @@ class Decoder(object):
 
         return decoded
 
-    def decode_line(self, df):
-        pass
-
-    def clear_past(self):
-        pass
-
 
 class BeamSearchDecoder(Decoder):
     """
@@ -72,6 +75,9 @@ class BeamSearchDecoder(Decoder):
                                      sequence_length=self.sequence_length,
                                      beam_width=self.beam_width,
                                      top_paths=top_paths)
+
+    def get_name_string(self):
+        return f"{self.__class__.__name__}-bw{self.beam_width}"
 
     def beam_search(self, df):
         ocr_logits = np.log(np.expand_dims(df.values, axis=1))
@@ -100,8 +106,12 @@ class BeamSearchDecoder(Decoder):
 
 class BestPathDecoder(Decoder):
     """
-    Best Path implementation
+    Best Path fast implementation
     """
+
+    def get_name_string(self):
+        return self.__class__.__name__
+
     def decode_line(self, df):
         """
         Standard CTC Decoder with beam width as specified
@@ -124,20 +134,28 @@ class BestPathDecoder(Decoder):
 
 class LanguageDecoder(Decoder):
 
-    def __init__(self, model_name, model_dir, beam_width, session):
+    def __init__(self, model_name, model_dir, beam_width, alpha, session):
         super().__init__()
+        assert 0 < alpha < 1, "alpha has to be in the interval [0, 1]"
+
+        # initialize decoder parameters
         self.beam_width = beam_width
-        self.ctc_decoder = BeamSearchDecoder(self.beam_width, session, top_paths=beam_width)
-        self.model = language_models.GPTModel(model_name=model_name, model_dir=model_dir, session=session)
-        self.enc = self.model.encoder
+        self.alpha = alpha
         self.history = '<|endoftext|>'
         self.past = None
 
-        # load model parameters
+        # initialize language model dependencies
+        self.ctc_decoder = BeamSearchDecoder(self.beam_width, session, top_paths=beam_width)
+        self.model = language_models.GPTModel(model_name=model_name, model_dir=model_dir, session=session)
+        self.enc = self.model.encoder
+
+        # load language model parameters
         saver = tf.train.Saver()
-        ckpt = tf.train.latest_checkpoint(os.path.join(self.model.model_dir,
-                                                       self.model.model_name))
+        ckpt = tf.train.latest_checkpoint(os.path.join(self.model.model_dir, self.model.model_name))
         saver.restore(session, ckpt)
+
+    def get_name_string(self):
+        return f"{self.__class__.__name__}-bw{self.beam_width}-a{self.alpha}"
 
     @staticmethod
     def remove_blank_at_beam_end(beams, logits):
@@ -154,7 +172,7 @@ class LanguageDecoder(Decoder):
                     new_beams.append(b)
                     new_logits.append(logits[j])
 
-        return new_beams, new_logits
+        return new_beams, np.array(new_logits)
 
     def decode_line(self, df):
         """
@@ -200,8 +218,9 @@ class LanguageDecoder(Decoder):
                 past_list.append(past)
 
             # merge NLP scores with OCR scores
+            merged_scores = self.alpha * scores + (1 - self.alpha) * ocr_logits
 
-            merged_scores = (scores + ocr_logits) / 2
+            # save best beam
             best_beam = np.argmax(merged_scores)
             output += beams[best_beam]
             self.history += beams[best_beam]
@@ -227,20 +246,20 @@ class LanguageDecoder(Decoder):
 
 
 class LanguageDecoder124M(LanguageDecoder):
-    def __init__(self, model_dir, beam_width, session):
-        super().__init__("124M", model_dir, beam_width, session)
+    def __init__(self, model_dir, beam_width, alpha, session):
+        super().__init__("124M", model_dir, beam_width, alpha, session)
 
 
 class LanguageDecoder355M(LanguageDecoder):
-    def __init__(self, model_dir, beam_width, session):
-        super().__init__("355M", model_dir, beam_width, session)
+    def __init__(self, model_dir, beam_width, alpha, session):
+        super().__init__("355M", model_dir, beam_width, alpha, session)
 
 
 class LanguageDecoder774M(LanguageDecoder):
-    def __init__(self, model_dir, beam_width, session):
-        super().__init__("774M", model_dir, beam_width, session)
+    def __init__(self, model_dir, beam_width, alpha, session):
+        super().__init__("774M", model_dir, beam_width, alpha, session)
 
 
 class LanguageDecoder1558M(LanguageDecoder):
-    def __init__(self, model_dir, beam_width, session):
-        super().__init__("1558M", model_dir, beam_width, session)
+    def __init__(self, model_dir, beam_width, alpha, session):
+        super().__init__("1558M", model_dir, beam_width, alpha, session)

@@ -40,15 +40,16 @@ def main(tess_base, image_base, decoder, scalings, visualize=False):
 
     print(f"Decoding took {decoder_time} seconds")
 
-    metrics.eval_docs(softmax_files, scalings, decoder.__class__.__name__)
+    metrics.eval_docs(softmax_files, scalings, decoder.get_name_string())
 
 
-def language_model_decoding(decoder_class, tess_base, image_base, model_dir, beam_width, scalings, visualize):
+def language_model_decoding(decoder_class, tess_base, image_base, model_dir, beam_width, alpha, scalings, visualize):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     with tf.Session(graph=tf.Graph(), config=config) as sess:
         decoder = decoder_class(model_dir=model_dir,
                                 beam_width=beam_width,
+                                alpha=alpha,
                                 session=sess)
         tf.get_default_graph().finalize()
         main(tess_base=tess_base,
@@ -91,6 +92,8 @@ if __name__ == "__main__":
                             help='opens a GUI to examine errors')
     arg_parser.add_argument('-bw', '--beam_width', type=int,
                             help='beam width for ctc decoder')
+    arg_parser.add_argument('-a', '--alpha', default=0.5,
+                            help="weight that is applied to the language model")
     arg_parser.add_argument('-d', '--decoder', default="CTCBestPathDecoder",
                             help='class name of a decoder in decoder.py')
     arg_parser.add_argument('--model_dir', type=str,
@@ -122,6 +125,7 @@ if __name__ == "__main__":
                                 tess_base=args.tess_base,
                                 image_base=args.image_base,
                                 beam_width=args.beam_width,
+                                alpha=args.alpha,
                                 model_dir=args.model_dir,
                                 scalings=args.scalings,
                                 visualize=args.visualize)
