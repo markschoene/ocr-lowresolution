@@ -74,32 +74,41 @@ class Document(object):
 
         page['files'] = out_files
 
-    def save_page_text(self, text, img_path, suffix):
-        file_name = f"{os.path.basename(img_path)[:-4]}-{self.scalings}-{suffix}.txt"
-        save_path = os.path.join(self.tess_base, self.name, file_name)
-        with open(save_path, "w") as f:
-            f.write(text)
-
-    def ocr_document(self, decoder):
+    def ocr_document(self, decoder, cache=True):
         """
         Uses a CTC decoder to generate human readable text from softmax files stored in this document
         :param decoder: a CTC decoder class with method 'decode_line'
+        :param cache: Doesn't call the decoder if text files are found on drive
         :return:
         """
         for font, d in self.fonts.items():
             d['page_texts'] = []
             for i, page in zip(d['page_numbers'], d['pages']):
-                print(f"Decoding outputs: {self.name} - {font} - Page {i} / {len(d['pages'])}")
 
-                # decode individual lines
-                for file in page['files']:
-                    text = decoder.decode_line(file['data'])
-                    file['text'] = text
+                # path where to save and read text files
+                file_name = f"{os.path.basename(page['img'])[:-4]}-{self.scalings}-{decoder.get_name_string()}.txt"
+                save_path = os.path.join(self.tess_base, self.name, file_name)
 
-                # merge lines to full page text
-                t = self.page_text(page['files'])
-                self.save_page_text(text=t, img_path=page['img'], suffix=decoder.get_name_string())
-                d['page_texts'].append(t)
+                # get page text from cache
+                if cache and os.path.isfile(save_path):
+                    print(f"Reading text from {save_path}")
+                    with open(save_path, "r") as f:
+                        t = f.read()
+                    d['page_texts'].append(t)
+
+                # get page text from decoder
+                else:
+                    # decode individual lines
+                    print(f"Decoding outputs: {self.name} - {font} - Page {i} / {len(d['pages'])}")
+                    for file in page['files']:
+                        text = decoder.decode_line(file['data'])
+                        file['text'] = text
+
+                    # merge lines to full page text
+                    t = self.page_text(page['files'])
+                    with open(save_path, "w") as f:
+                        f.write(t)
+                    d['page_texts'].append(t)
 
     @staticmethod
     def read_line(line_path, header):

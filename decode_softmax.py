@@ -11,7 +11,7 @@ from softmax_tools import metrics
 import softmax_tools.decoder
 
 
-def main(tess_base, image_base, decoder, scalings, visualize=False):
+def main(tess_base, image_base, decoder, scalings, cache=False, visualize=False):
     print(f"Using {decoder.__class__.__name__} to decode ocr files")
 
     # read header to label tesseract softmax outputs
@@ -28,7 +28,7 @@ def main(tess_base, image_base, decoder, scalings, visualize=False):
     decoder_time = 0
     for _, doc in softmax_files.items():
         start = time.time()
-        doc.ocr_document(decoder)
+        doc.ocr_document(decoder, cache)
         decoder.clear_past()
         end = time.time()
         decoder_time += end - start
@@ -43,7 +43,9 @@ def main(tess_base, image_base, decoder, scalings, visualize=False):
     metrics.eval_docs(softmax_files, scalings, decoder.get_name_string())
 
 
-def language_model_decoding(decoder_class, tess_base, image_base, model_dir, beam_width, alpha, scalings, visualize):
+def language_model_decoding(decoder_class, tess_base, image_base, model_dir,
+                            beam_width, alpha,
+                            scalings, cache, visualize):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     with tf.Session(graph=tf.Graph(), config=config) as sess:
@@ -56,19 +58,24 @@ def language_model_decoding(decoder_class, tess_base, image_base, model_dir, bea
              image_base=image_base,
              decoder=decoder,
              scalings=scalings,
+             cache=cache,
              visualize=visualize)
 
 
-def best_path_decoding(decoder_class, tess_base, image_base, scalings, visualize):
+def best_path_decoding(decoder_class, tess_base, image_base,
+                       scalings, cache, visualize):
     decoder = decoder_class()
     main(tess_base=tess_base,
          image_base=image_base,
          decoder=decoder,
          scalings=scalings,
+         cache=cache,
          visualize=visualize)
 
 
-def beam_search_decoding(decoder_class, tess_base, image_base, beam_width, scalings, visualize):
+def beam_search_decoding(decoder_class, tess_base, image_base,
+                         beam_width,
+                         scalings, cache, visualize):
     with tf.Session() as sess:
         decoder = decoder_class(beam_width=beam_width, session=sess)
         tf.get_default_graph().finalize()
@@ -76,6 +83,7 @@ def beam_search_decoding(decoder_class, tess_base, image_base, beam_width, scali
              image_base=image_base,
              decoder=decoder,
              scalings=scalings,
+             cache=cache,
              visualize=visualize)
 
 
@@ -90,6 +98,8 @@ if __name__ == "__main__":
                             help='scalings to use, e.g. L0, C0, B0, B05, B1, B15, B2')
     arg_parser.add_argument('-v', '--visualize', action='store_true',
                             help='opens a GUI to examine errors')
+    arg_parser.add_argument('--cache', action='store_true',
+                            help='Uses text files as cache if already produced')
     arg_parser.add_argument('-bw', '--beam_width', type=int,
                             help='beam width for ctc decoder')
     arg_parser.add_argument('-a', '--alpha', default=0.5, type=float,
@@ -108,6 +118,7 @@ if __name__ == "__main__":
                            tess_base=args.tess_base,
                            image_base=args.image_base,
                            scalings=args.scalings,
+                           cache=args.cache,
                            visualize=args.visualize)
     elif 'BeamSearch' in args.decoder:
         assert args.beam_width, "Please set the '-bw' argument to use a beam search decoder"
@@ -116,6 +127,7 @@ if __name__ == "__main__":
                              image_base=args.image_base,
                              beam_width=args.beam_width,
                              scalings=args.scalings,
+                             cache=args.cache,
                              visualize=args.visualize)
 
     elif 'LanguageDecoder' in args.decoder:
@@ -128,6 +140,7 @@ if __name__ == "__main__":
                                 alpha=args.alpha,
                                 model_dir=args.model_dir,
                                 scalings=args.scalings,
+                                cache=args.cache,
                                 visualize=args.visualize)
 
     else:
