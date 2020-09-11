@@ -158,21 +158,49 @@ class LanguageDecoder(Decoder):
         return f"{self.__class__.__name__}-bw{self.beam_width}-a{self.alpha}"
 
     @staticmethod
-    def remove_blank_at_beam_end(beams, logits):
+    def replace_hyphen(beams, logits):
+        logits = logits.tolist()
+        for j in range(len(beams)):
+            if '-' in beams[j]:
+                beams.append(beams[j].replace("-", " "))
+                logits.append(logits[j])
+        logits = np.array(logits)
+
+        return beams, logits
+
+    @staticmethod
+    def fix_blanks(beams, logits, start):
         new_beams, new_logits = [], []
         for j in range(len(beams)):
+
+            # remove blanks at the end
             b = deepcopy(beams[j])
             while len(b) > 1 and b[-1] == ' ':
                 b = b[:-1]
-            if b == beams[j]:
+
+            # condense blanks at the beginning s.t. exactly one blank is present
+            i = 0
+            while len(b) > i and b[i] == ' ':
+                i += 1
+            b = b[i:] if start else ' ' + b[i:]
+
+            # save beam and add beam probabilities if beam already in the list
+            if b in new_beams:
+                idx = new_beams.index(b)
+                new_logits[idx] = np.log(np.exp(logits[j]) + np.exp(new_logits[idx]))
+            else:
                 new_beams.append(b)
                 new_logits.append(logits[j])
-            else:
-                if b not in beams:
-                    new_beams.append(b)
-                    new_logits.append(logits[j])
 
         return new_beams, np.array(new_logits)
+
+    def modify_beams(self, beams, logits):
+        start = False
+        if self.history == '<|endoftext|>' or self.history[-1] == "\n":
+            start = True
+        beams, logits = self.fix_blanks(beams, logits, start=start)
+        #beams, logits = self.replace_hyphen(beams, logits)
+        return beams, logits
 
     def decode_line(self, df):
         """
@@ -201,7 +229,7 @@ class LanguageDecoder(Decoder):
             beams, ocr_logits = self.ctc_decoder.beam_search(seq)
 
             # prepare beams for NLP
-            beams, ocr_logits = self.remove_blank_at_beam_end(beams=beams, logits=ocr_logits)
+            beams, ocr_logits = self.modify_beams(beams=beams, logits=ocr_logits)
             beams_encoded = [self.enc.encode(beam) for beam in beams]
 
             # get past transformer attention to reduce compute
