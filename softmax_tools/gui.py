@@ -1,6 +1,8 @@
 # Python Library
 import time
+import os
 import difflib
+import subprocess
 import PySimpleGUI as sg
 import matplotlib
 import matplotlib.pyplot as plt
@@ -74,17 +76,22 @@ def new_line_window(canvas1, canvas2, canvas_segmentation, files, text_field, bb
     # update bounding box coordinates
     bbox_field.Update(value=str(file['bbox']))
 
+    # Add image to segmentation canvas
+    add_segmentation(canvas_segmentation, state, files, img, h_scale, v_scale, lines[state['n_iter']])
+
+
+def add_segmentation(canvas, state, files, img, h_scale, v_scale, highlight_index=-1):
     # Add image to the segmentation canvas
     if 'segmentation_figure' in state.keys():
         visuals.draw_segmentation(ax=state['segmentation_ax'],
-                                  img=img, index=lines[state['n_iter']],
+                                  img=img, index=highlight_index,
                                   files=files, h_scale=h_scale, v_scale=v_scale)
         state['segmentation_figure'].draw()
     else:
-        seg, ax3 = plt.subplots(1, 1, figsize=(4, 6))
-        visuals.draw_segmentation(ax=ax3, img=img, index=lines[state['n_iter']],
+        seg, ax3 = plt.subplots(1, 1, figsize=(6, 8))
+        visuals.draw_segmentation(ax=ax3, img=img, index=highlight_index,
                                   files=files, h_scale=h_scale, v_scale=v_scale)
-        canvas_segmentation_fig = draw_figure(canvas_segmentation, seg)
+        canvas_segmentation_fig = draw_figure(canvas, seg)
         state['segmentation_figure'] = canvas_segmentation_fig
         state['segmentation_ax'] = ax3
 
@@ -238,6 +245,67 @@ def softmax_gui(files, image_path, figsize, lowres=False):
 
         elif event == "Toggle Resolution":
             pass
+
+        # End program if user closes window or
+        # presses the OK button
+        elif event == "Exit" or event == sg.WIN_CLOSED:
+            break
+
+    window.close()
+
+
+def segmentation_gui(softmax_files, move_dir):
+    # Define the window layout
+    segmentation_column = [
+        [sg.Canvas(key="-SEGMENTATION-")],
+        [sg.Button("Next Page"), sg.Button("Copy Image"), sg.Button("Exit")],
+    ]
+    layout = [
+        [sg.Column(segmentation_column)],
+    ]
+
+    # Create the form and show it without the plot
+    window = sg.Window(
+        "Inspect softmax output",
+        layout,
+        location=(0, 0),
+        finalize=True,
+        element_justification="center",
+        return_keyboard_events=True,
+        font="Helvetica 18",
+    )
+
+    current_state = {"img": "",
+                     "scale": 1,
+                     "n_iter": 0}
+
+    pages = (page for name, doc in softmax_files.items()
+             for font, pages in doc.fonts.items()
+             for page in pages['pages'])
+
+    def next_page():
+        page = next(pages)
+        print(page['img'])
+        img = plt.imread(page['img'].replace("-simulated-60dpi", ""))
+        add_segmentation(window["-SEGMENTATION-"].TKCanvas,
+                         current_state,
+                         page['files'],
+                         img,
+                         h_scale=1, v_scale=1)
+        return page
+
+    # Create an event loop
+    page = next_page()
+    while True:
+        event, values = window.read()
+
+        if event == "Next Page":
+            page = next_page()
+
+        elif event == "Copy Image":
+            target = os.path.join(move_dir, os.path.basename(page['img']))
+            status = subprocess.call(f"cp {page['img']} {target}", shell=True)
+            page = next_page()
 
         # End program if user closes window or
         # presses the OK button

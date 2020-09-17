@@ -58,8 +58,11 @@ def draw_segmentation(ax, img, index, files, h_scale=1, v_scale=1):
     ax.imshow(img, cmap='gray', vmin=0, vmax=1, aspect=1)
     ax.set_axis_off()
 
+    xmin = img.shape[1]
     for i, file in enumerate(files):
         x1, y1, x2, y2 = file['bbox']
+        xmin = x1 if x1 < xmin else xmin
+
         x1, x2 = int(x1 * h_scale), int(x2 * h_scale)
         y1, y2 = int(y1 * v_scale), int(y2 * v_scale)
 
@@ -70,6 +73,7 @@ def draw_segmentation(ax, img, index, files, h_scale=1, v_scale=1):
         rec = Rectangle((x1, y1), x2 - x1, y2 - y1, fill=fill, color=color, alpha=alpha)
         ax.add_patch(rec)
 
+    plt.plot([xmin, xmin], [0, img.shape[0]])
     plt.tight_layout()
 
     return ax
