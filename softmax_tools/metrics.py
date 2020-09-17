@@ -9,7 +9,7 @@ from hocr_metrics import get_metrics
 
 def eval_docs(doc_list, scalings, decoder_name):
     out = {}
-    tessbase = ""
+    accuracies = {}
     for doc_name, doc in doc_list.items():
         print(f"Processing metrics for {doc_name}")
         tessbase = doc.tess_base
@@ -18,6 +18,9 @@ def eval_docs(doc_list, scalings, decoder_name):
 
             if font not in out.keys():
                 out[font] = []
+
+            if font not in accuracies.keys():
+                accuracies[font] = []
 
             for i, t in enumerate(d['page_texts']):
                 img_path = d['pages'][i]['img']
@@ -31,7 +34,16 @@ def eval_docs(doc_list, scalings, decoder_name):
 
                 txt, csv = get_metrics(t, gt, filename=img_path)
                 csv = StringIO(csv)
-                out[font].append(pd.read_csv(csv))
+                df = pd.read_csv(csv)
+
+                if df.loc[0, 'WLA quotes'] < 0.90:
+                    print(f"{round(df.loc[0, 'WLA quotes'], 4)} Bad performance on: ", img_path)
+
+                accuracies[font].append(df.loc[0, 'WLA quotes'])
+                out[font].append(df)
+
+    accuracies = pd.DataFrame(accuracies)
+    accuracies.to_csv(os.path.join(tessbase, 'metrics', 'accuracies.csv'), index=False)
 
     for font in out.keys():
         out[font] = pd.concat(out[font], ignore_index=True)
