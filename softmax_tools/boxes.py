@@ -57,25 +57,15 @@ def align_boxes(boxes, iou_thresh=0.9):
     return links
 
 
-def test_align_boxes(boxes, links):
-    out_boxes = []
-    for i, box in enumerate(boxes):
-        out = box.copy()
-        for j in links[i]:
-            out = vertical_union(boxes[j], out)
-        out_boxes.append(out)
-    out_boxes = np.array(out_boxes)
-    ind = np.argsort(out_boxes[:, 1])
-    out_boxes = out_boxes[ind]
-
-    # remove duplicates:
-    out = []
-    for i in range(len(out_boxes) - 1):
-        if not np.array_equal(out_boxes[i], out_boxes[i + 1]):
-            out.append(out_boxes[i])
-    out.append(out_boxes[-1])
-
-    return np.array(out)
+def get_line(line, box_links):
+    line = set(line)
+    line_length = len(line)
+    for j in line.copy():
+        line.update(box_links[j])
+    if line_length == len(line):
+        return np.array(list(line), dtype=np.int32)
+    else:
+        return get_line(line, box_links)
 
 
 def page_shaddow(boxes, box_links):
@@ -85,10 +75,10 @@ def page_shaddow(boxes, box_links):
     page = []
 
     for i in ind:
-        blinks = np.array(box_links[i])
-        line = boxes[blinks]
-        line_sort = np.argsort(line[:, 0])
-        blinks = blinks[line_sort]
+        blinks = np.array(get_line(box_links[i], box_links))
+        line_boxes = boxes[blinks]
+        line_sort = np.argsort(line_boxes[:, 0])
+        blinks = blinks[line_sort].tolist()
         page.append(blinks)
 
     # remove duplicates:

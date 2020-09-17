@@ -226,6 +226,10 @@ class LanguageDecoder(Decoder):
             # do beam search
             seq = df.iloc[separator[i - 1] + 1:separator[i]]
 
+            if len(seq) == 0:
+                # catch empty sequences, e.g. from badly rotated images
+                continue
+
             beams, ocr_logits = self.ctc_decoder.beam_search(seq)
 
             # prepare beams for NLP

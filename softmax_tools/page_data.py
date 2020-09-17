@@ -62,7 +62,8 @@ class Document(object):
             for page in d['pages']:
                 self.sort_page(page)
 
-    def sort_page(self, page):
+    @staticmethod
+    def sort_page(page):
         bboxes = [file['bbox'] for file in page['files']]
         links = boxes.align_boxes(bboxes, iou_thresh=0.6)
         page_shaddow = boxes.page_shaddow(bboxes, links)
@@ -132,11 +133,7 @@ class Document(object):
     def page_text(files):
         bboxes = [f['bbox'] for f in files]
         box_links = boxes.align_boxes(bboxes, iou_thresh=0.6)
-
-        aligned_boxes = boxes.test_align_boxes(bboxes, box_links)
         page_shaddow = boxes.page_shaddow(bboxes, box_links)
-        assert len(aligned_boxes) == len(page_shaddow), f"Number of aligned boxes ({len(aligned_boxes)}) " \
-                                                f"doesn't equal number of lines in page ({len(page_shaddow)})!"
 
         text = ""
 
@@ -146,16 +143,20 @@ class Document(object):
                 t += files[i]['text']
             return t
 
-        def blank_line(l):
-            height = aligned_boxes[l][3] - aligned_boxes[l][1]
-            diff = aligned_boxes[l][1] - aligned_boxes[l-1][3]
-            if diff > height / 2:
+        def blank_line(l, ps):
+            if l == 0:
+                return False
+            line_boxes = np.array(bboxes)[ps[l]]
+            prev_line_boxes = np.array(bboxes)[ps[l - 1]]
+            height = np.min(line_boxes[:, 3]) - np.max(line_boxes[:, 1])
+            diff = np.min(prev_line_boxes[:, 1]) - np.max(line_boxes[:, 3])
+            if diff > height / 3:
                 return True
             else:
                 return False
 
         for line, arr in enumerate(page_shaddow):
-            if line > 0 and blank_line(line):
+            if line > 0 and blank_line(line, page_shaddow):
                 text += "\n"
             text += append_text(arr)
             text += "\n"
