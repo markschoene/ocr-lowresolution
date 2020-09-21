@@ -42,9 +42,6 @@ def eval_docs(doc_list, scalings, decoder_name):
                 accuracies[font].append(df.loc[0, 'WLA quotes'])
                 out[font].append(df)
 
-    accuracies = pd.DataFrame(accuracies)
-    accuracies.to_csv(os.path.join(tessbase, 'metrics', 'accuracies.csv'), index=False)
-
     for font in out.keys():
         out[font] = pd.concat(out[font], ignore_index=True)
         out[font].loc[len(out[font])] = ['Total', out[font]['Chars'].sum(), out[font]['Words'].sum(),
@@ -57,3 +54,6 @@ def eval_docs(doc_list, scalings, decoder_name):
                                          ]
         outfile = os.path.join(tessbase, 'metrics', f'{font}-{scalings}-metrics-{decoder_name}.csv')
         out[font].to_csv(outfile, index=False)
+
+        accuracies[font] = pd.DataFrame(data=accuracies[font], columns=[font])
+        accuracies[font].to_csv(os.path.join(tessbase, 'metrics', f'{font}-{scalings}-accuracies-{decoder_name}.csv'), index=False)

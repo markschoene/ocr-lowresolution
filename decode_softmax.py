@@ -11,7 +11,7 @@ from softmax_tools import metrics
 import softmax_tools.decoder
 
 
-def main(tess_base, image_base, decoder, scalings, cache=False, visualize=False):
+def main(tess_base, image_base, decoder, scalings, exclude, cache=False, visualize=False):
     print(f"Using {decoder.__class__.__name__} to decode ocr files")
 
     # read header to label tesseract softmax outputs
@@ -22,7 +22,8 @@ def main(tess_base, image_base, decoder, scalings, cache=False, visualize=False)
     softmax_files = read.get_softmax_files(base_path=tess_base,
                                            image_base=image_base,
                                            scalings=scalings,
-                                           header=header)
+                                           header=header,
+                                           exclude=exclude)
 
     # decode lines
     decoder_time = 0
@@ -45,7 +46,7 @@ def main(tess_base, image_base, decoder, scalings, cache=False, visualize=False)
 
 def language_model_decoding(decoder_class, tess_base, image_base, model_dir,
                             beam_width, alpha,
-                            scalings, cache, visualize):
+                            scalings, cache, visualize, exclude):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     with tf.Session(graph=tf.Graph(), config=config) as sess:
@@ -59,23 +60,25 @@ def language_model_decoding(decoder_class, tess_base, image_base, model_dir,
              decoder=decoder,
              scalings=scalings,
              cache=cache,
-             visualize=visualize)
+             visualize=visualize,
+             exclude=exclude)
 
 
 def best_path_decoding(decoder_class, tess_base, image_base,
-                       scalings, cache, visualize):
+                       scalings, cache, visualize, exclude):
     decoder = decoder_class()
     main(tess_base=tess_base,
          image_base=image_base,
          decoder=decoder,
          scalings=scalings,
          cache=cache,
-         visualize=visualize)
+         visualize=visualize,
+         exclude=exclude)
 
 
 def beam_search_decoding(decoder_class, tess_base, image_base,
                          beam_width,
-                         scalings, cache, visualize):
+                         scalings, cache, visualize, exclude):
     with tf.Session() as sess:
         decoder = decoder_class(beam_width=beam_width, session=sess)
         tf.get_default_graph().finalize()
@@ -84,7 +87,8 @@ def beam_search_decoding(decoder_class, tess_base, image_base,
              decoder=decoder,
              scalings=scalings,
              cache=cache,
-             visualize=visualize)
+             visualize=visualize,
+             exclude=exclude)
 
 
 if __name__ == "__main__":
@@ -108,10 +112,13 @@ if __name__ == "__main__":
                             help='class name of a decoder in decoder.py')
     arg_parser.add_argument('--model_dir', type=str,
                             help='Path to the gpt-2 models directory')
+    arg_parser.add_argument('--exclude', type=str,
+                            help='Path to a directory with png files that shall be excluded from evaluation')
 
     args = arg_parser.parse_args()
 
     decoder_cls = getattr(softmax_tools.decoder, args.decoder, f"Decoder class '{args.decoder}' does not exist")
+    exclude = [f for f in os.listdir(args.exclude) if '.png' in f] if args.exclude else []
 
     if 'BestPath' in args.decoder:
         best_path_decoding(decoder_class=decoder_cls,
@@ -119,7 +126,8 @@ if __name__ == "__main__":
                            image_base=args.image_base,
                            scalings=args.scalings,
                            cache=args.cache,
-                           visualize=args.visualize)
+                           visualize=args.visualize,
+                           exclude=exclude)
     elif 'BeamSearch' in args.decoder:
         assert args.beam_width, "Please set the '-bw' argument to use a beam search decoder"
         beam_search_decoding(decoder_class=decoder_cls,
@@ -128,7 +136,8 @@ if __name__ == "__main__":
                              beam_width=args.beam_width,
                              scalings=args.scalings,
                              cache=args.cache,
-                             visualize=args.visualize)
+                             visualize=args.visualize,
+                             exclude=exclude)
 
     elif 'LanguageDecoder' in args.decoder:
         assert args.model_dir, "Please set the directory to the gpt-2 models, e.g. ../gpt-2/models"
@@ -141,7 +150,8 @@ if __name__ == "__main__":
                                 model_dir=args.model_dir,
                                 scalings=args.scalings,
                                 cache=args.cache,
-                                visualize=args.visualize)
+                                visualize=args.visualize,
+                                exclude=exclude)
 
     else:
         print(f"Decoder '{args.decoder}' is not a valid decoder")

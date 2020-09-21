@@ -154,6 +154,7 @@ def softmax_gui(files, image_path, figsize, lowres=False):
     )
 
     # read page ground truth
+    image_path = image_path.replace("-simulated-60dpi", "")
     ground_truth_path = image_path.replace(".png", ".gt.txt")
     with open(ground_truth_path, "r") as f:
         gt = f.read()

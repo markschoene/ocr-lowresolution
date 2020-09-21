@@ -8,13 +8,14 @@ from softmax_tools import boxes
 
 
 class Document(object):
-    def __init__(self, name, tess_base, image_base, scalings):
+    def __init__(self, name, tess_base, image_base, scalings, exclude):
         self.name = name
         self.scalings = scalings
         self.tess_base = tess_base
         self.image_base = image_base
         self.root = os.path.join(tess_base, name, 'Softmax')
         self.fonts = dict()
+        self.exclude = exclude
 
     def add_file(self, file_name, header):
 
@@ -28,12 +29,14 @@ class Document(object):
             self.fonts[font] = {'pages': [], 'page_numbers': []}
 
         img_name = file_name.split('-' + self.scalings)[0] + '.png'
+        if img_name in self.exclude:
+            return 0
         img_path = os.path.join(self.image_base, self.name, img_name)
         self.add_page(font, page_index, img_path)
 
         df, bbox = self.read_line(file_path, header)
         out = {'path': file_path, 'font': font, 'page': page_index, 'data': df, 'bbox': bbox}
-        self.fonts[font]['pages'][page_index - 1]['files'].append(out)
+        self.fonts[font]['pages'][-1]['files'].append(out)
 
     def add_page(self, font, page_index, image_path):
         """
@@ -45,17 +48,8 @@ class Document(object):
         """
         if page_index not in self.fonts[font]['page_numbers']:
             p = {'files': [], 'img': image_path}
-            if self.fonts[font]['pages']:
-                for i in range(max(self.fonts[font]['page_numbers']) + 1, page_index + 1):
-
-                    self.fonts[font]['pages'].append(p)
-                    self.fonts[font]['page_numbers'].append(i)
-            else:
-                self.fonts[font]['pages'].append(p)
-                self.fonts[font]['page_numbers'].append(page_index)
-
-        assert self.fonts[font]['page_numbers'] == list(range(min(self.fonts[font]['page_numbers']),
-                                                              max(self.fonts[font]['page_numbers']) + 1))
+            self.fonts[font]['pages'].append(p)
+            self.fonts[font]['page_numbers'].append(page_index)
 
     def sort_pages(self):
         for font, d in self.fonts.items():
